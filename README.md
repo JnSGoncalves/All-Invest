@@ -1,7 +1,6 @@
 # All Invest — API (HU01: Cadastro de usuário)
 
 API em FastAPI + SQLAlchemy para o HUB de investimentos All Invest.
-Este primeiro recorte implementa a HU01 (cadastro de usuário) com CA01 e CA02.
 
 ## Estrutura
 
@@ -14,6 +13,7 @@ app/
   crud.py        # get_user_by_email, create_user
   routers/
     users.py     # POST /users
+    auth.py      # POST /auth/login
   main.py        # instancia o FastAPI e registra as rotas
 requirements.txt
 .env.example
@@ -74,8 +74,24 @@ Cadastra um novo usuário.
 
 A senha nunca é armazenada em texto puro: é hasheada com `bcrypt` antes de ir para o banco.
 
-## Próximos passos sugeridos
+### `POST /auth/login` — Login (HU02)
 
-- HU02 (login): a função `verify_password` em `security.py` já está pronta para isso.
-- HU07 e demais HUs de corretora/ações: os models `Broker`, `Stock`, `UserStock` e `UserBroker`
-  já refletem o MER; falta implementar as rotas e regras de negócio.
+Autentica um usuário já cadastrado.
+
+**Request body:**
+```json
+{
+  "email": "kayna@example.com",
+  "password": "senha_com_8_ou_mais_caracteres"
+}
+```
+
+**Respostas:**
+- `200 OK` — CA01: credenciais corretas, retorna `{ "access_token": "...", "token_type": "bearer" }` (JWT válido por 60 minutos).
+- `404 Not Found` — CA02: e-mail não cadastrado, sugere o cadastro.
+- `401 Unauthorized` — conta existe, mas a senha está incorreta.
+
+O token gerado é auto-contido (JWT assinado com `SECRET_KEY`, sem depender de provedor externo) —
+resolve o "gerenciamento de sessão via REST" da história sem entrar em OAuth 2.0, que fica para a
+tarefa "Integrar API externa OAuth 2.0 - HU02" mais adiante. Defina `SECRET_KEY` no `.env` em produção.
+

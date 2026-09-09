@@ -17,3 +17,13 @@ class UserOut(BaseModel):
     name: str
     email: EmailStr
     created_at: datetime
+
+class UserLogin(BaseModel):
+    """Payload do formulário de login (HU02 - CA01/CA02)."""
+    email: EmailStr
+    password: str
+
+class Token(BaseModel):
+    """Resposta do login: token de sessão a ser enviado nas próximas requisições."""
+    access_token: str
+    token_type: str = "bearer"
