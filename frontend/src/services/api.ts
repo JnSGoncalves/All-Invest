@@ -18,3 +18,21 @@ export async function login(
 
   return response.json();
 }
+
+export async function cadastrar(
+  nome: string,
+  email: string,
+  senha: string
+): Promise<LoginResponse> {
+  const response = await fetch(`${API_URL}/cadastro`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ nome, email, senha }),
+  });
+
+  if (!response.ok) {
+    throw new Error("Não foi possível concluir o cadastro");
+  }
+
+  return response.json();
+}
