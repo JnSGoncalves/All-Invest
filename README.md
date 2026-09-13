@@ -27,15 +27,12 @@ requirements.txt
    source venv/bin/activate
    pip install -r requirements.txt
    ```
-2. Para testar localmente sem PostgreSQL, não é necessário configurar nada: a API usa o arquivo SQLite `all_invest.db` por padrão.
-  Se preferir deixar isso explícito, crie um `.env` com:
-  ```env
-  DATABASE_URL=sqlite:///./all_invest.db
-  ```
-  Para usar PostgreSQL, copie `.env.example` para `.env` e ajuste a `DATABASE_URL`.
-3. Suba a API:
+2. Configure o Supabase: copie `.env.example` para `.env` e substitua `DATABASE_URL` pela connection string PostgreSQL exibida em `Project Settings > Database > Connection string`.
+  Mantenha `?sslmode=require` na URL para exigir conexão TLS.
+3. No SQL Editor do Supabase, execute o conteúdo de [`database/CreateTables.sql`](database/CreateTables.sql) uma vez para criar as tabelas.
+4. Suba a API:
    ```bash
-   uvicorn app.main:app --reload
+  uvicorn backend.src.main:app --reload
    ```
 4. Docs interativas em `http://localhost:8000/docs`.
 
@@ -44,13 +41,10 @@ No Windows PowerShell, ative o ambiente virtual com:
 .\venv\Scripts\Activate.ps1
 ```
 
-O SQLite é suficiente para os testes locais. O arquivo `all_invest.db` é criado
-automaticamente na pasta do projeto e pode ser removido para começar novamente
-com um banco vazio. Em produção ou no uso integrado da equipe, prefira
-PostgreSQL.
-
-Na primeira execução, `Base.metadata.create_all()` cria as tabelas automaticamente
-a partir dos models. Para um projeto mais maduro, vale migrar para Alembic.
+O backend usa exclusivamente PostgreSQL no Supabase. As tabelas não são criadas
+automaticamente pela API: o schema versionado em `database/CreateTables.sql` deve
+ser aplicado no SQL Editor do projeto. Para alterações futuras, vale migrar esse
+script para Alembic.
 
 ## Endpoint implementado
 

@@ -1,7 +1,7 @@
-from sqlalchemy import Column, Integer, String, Numeric, ForeignKey, DateTime, func
+from sqlalchemy import CheckConstraint, Column, Integer, String, Numeric, ForeignKey, DateTime, func
 from sqlalchemy.orm import relationship
 
-from .database import Base
+from .db.database import Base
 
 
 class User(Base):
@@ -42,14 +42,17 @@ class Broker(Base):
 class UserStock(Base):
     __tablename__ = "users_stocks"
 
-    id = Column(Integer, primary_key=True, index=True)  # chave técnica; o MER não define PK explícita aqui
-    stock_id = Column(Integer, ForeignKey("stocks.stock_id"), nullable=False)
-    user_id = Column(Integer, ForeignKey("users.user_id"), nullable=False)
+    stock_id = Column(Integer, ForeignKey("stocks.stock_id"), primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.user_id"), primary_key=True)
     stock_quantity = Column(Integer, nullable=False)
-    trade_date = Column(DateTime(timezone=True), nullable=False)
-    stock_price = Column(Numeric, nullable=False)
+    trade_date = Column(DateTime(timezone=True), primary_key=True, server_default=func.now())
+    stock_price = Column(Numeric(15, 4), nullable=False)
     broker_id = Column(Integer, ForeignKey("brokers.broker_id"), nullable=False)
-    trade_side = Column(String, nullable=False)  # ex.: "compra" / "venda"
+    trade_side = Column(String, nullable=False)  # valores aceitos pelo schema: BUY / SELL
+
+    __table_args__ = (
+        CheckConstraint("trade_side IN ('BUY', 'SELL')", name="chk_trade_side"),
+    )
 
     user = relationship("User", back_populates="stocks")
     stock = relationship("Stock")
@@ -59,9 +62,8 @@ class UserStock(Base):
 class UserBroker(Base):
     __tablename__ = "users_brokers"
 
-    id = Column(Integer, primary_key=True, index=True)  # idem: chave técnica
-    broker_id = Column(Integer, ForeignKey("brokers.broker_id"), nullable=False)
-    user_id = Column(Integer, ForeignKey("users.user_id"), nullable=False)
+    broker_id = Column(Integer, ForeignKey("brokers.broker_id"), primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.user_id"), primary_key=True)
 
     user = relationship("User", back_populates="brokers")
     broker = relationship("Broker")
