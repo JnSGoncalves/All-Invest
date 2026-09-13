@@ -1,7 +1,7 @@
 from sqlalchemy.orm import Session
 
-from . import security
-from . import models
+from ..services import security
+from .. import models
 from . import schemas
 
 

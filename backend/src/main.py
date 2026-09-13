@@ -1,11 +1,7 @@
 from fastapi import FastAPI
 
-from .database import Base, engine
 from .routers import users
 from .routers import auth
-
-# Cria as tabelas no banco a partir dos models
-Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
     title="All Invest API",
