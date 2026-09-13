@@ -437,3 +437,15 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Dependencies
+**/node_modules/
+
+# Build
+**/dist/
+**/build/
+
+# Environment variables
+**/.env
+**/.env.*
+!**/.env.example
