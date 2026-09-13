@@ -1,0 +1,159 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap");
+
+:root {
+  --navy-deep: #060f26;
+  --panel: #0e1d42;
+  --panel-border: #1c2e5c;
+  --teal: #0b6b7a;
+  --teal-bright: #2e97a8;
+  --gold: #c79a4b;
+  --gold-bright: #e8bf7d;
+  --text-primary: #f5f7fb;
+  --text-muted: #8695b8;
+  --danger: #e0665a;
+  --success: #3fa876;
+}
+
+.register-screen {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(ellipse at top, #0e1d42 0%, var(--navy-deep) 65%);
+  padding: 32px 16px;
+  font-family: "Inter", system-ui, sans-serif;
+}
+
+.register-card {
+  position: relative;
+  width: 100%;
+  max-width: 380px;
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  padding: 40px 36px 32px 40px;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.register-card::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: linear-gradient(180deg, var(--teal-bright), var(--teal));
+}
+
+.register-logo {
+  margin: 0 0 18px;
+}
+
+.register-logo img {
+  display: block;
+  width: 100%;
+  max-width: 260px;
+  height: auto;
+}
+
+.register-subtitle {
+  margin: 0 0 28px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text-muted);
+  max-width: 32ch;
+}
+
+.register-form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.field label {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.field input {
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--panel-border);
+  color: var(--text-primary);
+  font-size: 15px;
+  font-family: inherit;
+  padding: 8px 2px;
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+
+.field input::placeholder {
+  color: #4c5a80;
+}
+
+.field input:focus {
+  border-bottom-color: var(--gold);
+}
+
+.field-error input {
+  border-bottom-color: var(--danger);
+}
+
+.field-message {
+  font-size: 12px;
+  color: var(--danger);
+}
+
+.register-success {
+  margin: 0;
+  font-size: 13px;
+  color: var(--success);
+  background: rgba(63, 168, 118, 0.1);
+  border: 1px solid rgba(63, 168, 118, 0.3);
+  border-radius: 4px;
+  padding: 10px 12px;
+}
+
+.register-button {
+  margin-top: 8px;
+  background: var(--gold);
+  color: var(--navy-deep);
+  border: none;
+  border-radius: 4px;
+  padding: 12px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.register-button:hover:not(:disabled) {
+  background: var(--gold-bright);
+}
+
+.register-button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.register-footer {
+  margin: 24px 0 0;
+  font-size: 12px;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .register-button,
+  .field input {
+    transition: none;
+  }
+}
