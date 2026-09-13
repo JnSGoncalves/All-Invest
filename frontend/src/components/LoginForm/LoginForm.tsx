@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from "react";
 import "./LoginForm.css";
-import logo from "C:/Users/pedro/all_invest/src/assets/all-invest-logo.png";
+import logo from "../../assets/all-invest-logo.png";
 
 interface FormErrors {
   email?: string;
