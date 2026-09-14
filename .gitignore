@@ -451,7 +451,7 @@ __marimo__/
 !**/.env.example
 
 # Environment
-.env
+*.env
 .env.*
 !.env.example
 
