@@ -1,0 +1,51 @@
+name: Deploy All Invest
+
+on:
+  workflow_dispatch:
+
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verificar ambiente
+        run: |
+          whoami
+          docker --version
+          docker compose version
+
+      - name: Criar .env do backend
+        run: |
+          cat > backend/.env <<EOF
+          DATABASE_URL=${{ secrets.DATABASE_URL }}
+          API_KEY=${{ secrets.API_KEY }}
+          EOF
+
+      - name: Criar .env do frontend
+        run: |
+          cat > frontend/.env <<EOF
+          VITE_API_URL=${{ secrets.VITE_API_URL }}
+          VITE_API_KEY=${{ secrets.API_KEY }}
+          EOF
+
+      - name: Criar .env do Docker Compose
+        run: |
+          cat > .env <<EOF
+          VITE_API_URL=${{ secrets.VITE_API_URL }}
+          VITE_API_KEY=${{ secrets.API_KEY }}
+          EOF
+
+      - name: Build e deploy
+        run: |
+          docker compose up -d --build
+
+      - name: Verificar containers
+        run: |
+          docker compose ps

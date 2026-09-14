@@ -1,9 +1,18 @@
 from sqlalchemy.orm import Session
 
-from . import security
-from . import models
+from ..services import security
+from .. import models
 from . import schemas
 
+
+def validate_api_key(db: Session, api_key: str) -> bool:
+    return (
+        db.query(models.ApiKey)
+        .filter(models.ApiKey.api_key == api_key)
+        .first()
+        is not None
+    )
+    
 
 def get_user_by_email(db: Session, email: str) -> models.User | None:
     """Usada na Verificação de Conta Existente (CA02)."""
