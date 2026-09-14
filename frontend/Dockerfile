@@ -1,12 +1,21 @@
-FROM node:20-alpine AS build
+FROM node:22-alpine AS build
 
 WORKDIR /app
 
 COPY package*.json ./
+
 RUN npm ci
 
 COPY . .
+
+ARG VITE_API_URL
+ARG VITE_API_KEY
+
+ENV VITE_API_URL=$VITE_API_URL
+ENV VITE_API_KEY=$VITE_API_KEY
+
 RUN npm run build
+
 
 FROM nginx:alpine
 

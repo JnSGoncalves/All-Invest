@@ -6,7 +6,7 @@ from ..db import crud
 from ..db import schemas
 from ..db.database import get_db
 
-router = APIRouter(prefix="/auth", tags=["auth"])
+router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 
 @router.post("/login", response_model=schemas.Token)
