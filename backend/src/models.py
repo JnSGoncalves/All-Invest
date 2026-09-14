@@ -3,6 +3,17 @@ from sqlalchemy.orm import relationship
 
 from .db.database import Base
 
+class ApiKey(Base):
+    __tablename__ = "api_keys"
+
+    project_id = Column(Integer, primary_key=True)
+    project_name = Column(String(150), nullable=False)
+    api_key = Column(String(255), nullable=False, unique=True)
+    created_at = Column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+    )
 
 class User(Base):
     """Tabela 'users' do MER — único bloco necessário para a HU01 (cadastro)."""

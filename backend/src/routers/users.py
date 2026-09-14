@@ -5,7 +5,7 @@ from ..db import schemas
 from ..db import crud
 from ..db.database import get_db
 
-router = APIRouter(prefix="/users", tags=["users"])
+router = APIRouter(prefix="/api/users", tags=["users"])
 
 
 @router.post("", response_model=schemas.UserOut, status_code=status.HTTP_201_CREATED)
