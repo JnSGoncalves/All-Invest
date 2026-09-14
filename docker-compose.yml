@@ -1,0 +1,18 @@
+services:
+  backend:
+    image: all-invest-backend:latest
+    build:
+      context: ./backend
+    env_file:
+      - .env
+    ports:
+      - "4670:4670"
+    restart: unless-stopped
+
+  frontend:
+    image: all-invest-frontend:latest
+    build:
+      context: ./frontend
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
