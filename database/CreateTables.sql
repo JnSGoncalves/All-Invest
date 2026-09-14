@@ -1,3 +1,10 @@
+CREATE TABLE api_keys (
+    project_id SERIAL PRIMARY KEY,
+    project_name VARCHAR(150) NOT NULL,
+    api_key    VARCHAR(255) NOT NULL UNIQUE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 -- =========================================================
 -- Script de criação das tabelas - PostgreSQL
 -- Modelo: users, stocks, brokers, users_stocks, users_brokers

@@ -1,18 +1,22 @@
 services:
+
   backend:
-    image: all-invest-backend:latest
     build:
       context: ./backend
+      dockerfile: Dockerfile
     env_file:
-      - .env
+      - ./backend/.env
     ports:
-      - "4670:4670"
+      - "127.0.0.1:4670:4670"
     restart: unless-stopped
 
   frontend:
-    image: all-invest-frontend:latest
     build:
       context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: ${VITE_API_URL}
+        VITE_API_KEY: ${VITE_API_KEY}
     ports:
-      - "3000:3000"
+      - "127.0.0.1:4671:80"
     restart: unless-stopped
