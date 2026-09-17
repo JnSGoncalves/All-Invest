@@ -5,6 +5,6 @@ export interface Usuario {
 }
 
 export interface LoginResponse {
-  usuario: Usuario;
-  token: string;
+  access_token: string;
+  token_type: string;
 }

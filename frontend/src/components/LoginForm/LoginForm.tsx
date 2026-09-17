@@ -1,3 +1,4 @@
+
 import { useState, type FormEvent } from "react";
 import "./LoginForm.css";
 import logo from "../../assets/all-invest-logo.png";
@@ -8,10 +9,11 @@ interface FormErrors {
 }
 
 interface LoginFormProps {
-  onSubmit?: (email: string, senha: string) => void;
+  onSubmit: (email: string, senha: string) => Promise<void>;
+  erro?: string | null;
 }
 
-export default function LoginForm({ onSubmit }: LoginFormProps) {
+export default function LoginForm({ onSubmit, erro }: LoginFormProps) {
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
   const [erros, setErros] = useState<FormErrors>({});
@@ -42,14 +44,11 @@ export default function LoginForm({ onSubmit }: LoginFormProps) {
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     if (!validarCampos()) return;
-
+  
     setEnviando(true);
+  
     try {
-      if (onSubmit) {
-        await onSubmit(email, senha);
-      } else {
-        console.log("Login:", { email, senha });
-      }
+      await onSubmit(email, senha);
     } finally {
       setEnviando(false);
     }
@@ -102,7 +101,12 @@ export default function LoginForm({ onSubmit }: LoginFormProps) {
               </span>
             )}
           </div>
-
+            {erro && (
+              <p className="field-message" role="alert">
+                {erro}
+              </p>
+            )}
+            
           <button type="submit" className="login-button" disabled={enviando}>
             {enviando ? "Entrando…" : "Entrar"}
           </button>

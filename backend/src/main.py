@@ -1,6 +1,7 @@
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.openapi.utils import get_openapi
+from fastapi.middleware.cors import CORSMiddleware
 
 from .db.crud import validate_api_key
 from .db.database import SessionLocal
@@ -48,7 +49,20 @@ async def verify_api_key(request: Request, call_next):
 
     finally:
         db.close()
+
+
         
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:5173",  # Frontend pelo Vite
+        "http://localhost:4671",  # Frontend pelo Docker
+    ],
+    allow_credentials=False,
+    allow_methods=["GET", "POST"],
+    allow_headers=["Content-Type", "X-API-Key", "Authorization"],
+)
+
 
 app.include_router(users.router)
 app.include_router(auth.router)
