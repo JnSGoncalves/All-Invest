@@ -82,3 +82,30 @@ class StockValidationOut(BaseModel):
     stock_name: str
     company_name: str
     valido: bool
+    
+class TickerOut(BaseModel):
+    """Ticker normalizado retornado pela brapi.dev."""
+ 
+    stock_name: str
+    company_name: str
+    asset_type: Optional[str] = None
+    sector: Optional[str] = None
+    is_active: bool = True
+    logo_url: Optional[str] = None
+ 
+ 
+class TickerListOut(BaseModel):
+    """Resposta paginada de listagem de tickers."""
+ 
+    results: list[TickerOut]
+    page: int
+    total_pages: int
+    total_items: int
+    has_next_page: bool
+ 
+ 
+class TickerAutocompleteOut(BaseModel):
+    """Item leve para sugestões de autocomplete no front."""
+ 
+    stock_name: str
+    company_name: str
