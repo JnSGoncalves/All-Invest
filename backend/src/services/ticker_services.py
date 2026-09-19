@@ -3,7 +3,7 @@ services/ticker_services.py
 
 Integração com a brapi.dev para:
   - validar se um ticker existe e está ativo na B3 antes do cadastro
-  - listar os tickers disponíveis na B3 com paginação e filtro
+  - listar os tickers disponíveis (screener simples)
   - fornecer sugestões de autocomplete para o front
 
 Endpoint utilizado: GET {BRAPI_URL}/tickers
@@ -11,6 +11,7 @@ Docs: https://brapi.dev/docs/tickers
 """
 
 import os
+from decimal import Decimal
 from typing import Optional
 
 import httpx
@@ -106,6 +107,38 @@ async def validar_ticker(stock_name: str) -> dict:
         )
 
     return _map_resultado(correspondencia)
+
+
+async def obter_cotacao(stock_name: str) -> Decimal:
+    """
+    Busca a cotação atual (preço de mercado) de um ticker.
+
+    Usado quando `stock_price` não é informado no cadastro da operação
+    (POST /api/stocks) — a API preenche automaticamente com o preço
+    corrente da B3 no momento do cadastro.
+
+    Usa /stocks/quote em vez de /tickers porque é o endpoint dedicado
+    a cotação (mais atualizado; /tickers pode trazer preço em cache
+    de listagem/screener).
+    """
+    ticker = stock_name.strip().upper()
+    data = await _get("/stocks/quote", {"symbols": ticker})
+
+    resultados = data.get("results", [])
+    if not resultados or "data" not in resultados[0]:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Cotação não encontrada para '{ticker}'.",
+        )
+
+    preco = resultados[0]["data"].get("regularMarketPrice")
+    if preco is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Cotação indisponível no momento para '{ticker}'.",
+        )
+
+    return Decimal(str(preco))
 
 
 async def listar_tickers(

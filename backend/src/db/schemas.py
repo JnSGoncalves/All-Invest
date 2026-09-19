@@ -2,7 +2,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Literal, Optional
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator, model_validator
 
 class UserCreate(BaseModel):
     """Payload do formulário de cadastro (CA01)."""
@@ -32,25 +32,56 @@ class Token(BaseModel):
 
 class StockTradeCreate(BaseModel):
     """Payload de cadastro de uma operação de compra/venda."""
-
+ 
     stock_name: str = Field(..., min_length=4, max_length=10, examples=["PETR4"])
     stock_quantity: int = Field(..., gt=0, examples=[100])
-    stock_price: Decimal = Field(..., gt=0, max_digits=15, decimal_places=4)
+    stock_price: Optional[Decimal] = Field(
+        default=None,
+        gt=0,
+        max_digits=15,
+        decimal_places=4,
+        description=(
+            "Preço pago na operação. Obrigatório quando auto_cotacao=False. "
+            "Deve ser omitido quando auto_cotacao=True."
+        ),
+    )
+    auto_cotacao: bool = Field(
+        default=False,
+        description=(
+            "Se true, a API ignora stock_price e busca automaticamente a "
+            "cotação atual do ativo na B3 no momento do cadastro. "
+            "Se false (padrão), stock_price é obrigatório."
+        ),
+    )
     broker_id: int = Field(..., gt=0)
     trade_side: Literal["BUY", "SELL"]
     trade_date: Optional[datetime] = None
-
+ 
     @field_validator("stock_name")
     @classmethod
     def normalizar_ticker(cls, v: str) -> str:
         return v.strip().upper()
-
+ 
     @field_validator("trade_date")
     @classmethod
     def nao_permitir_data_futura(cls, v: Optional[datetime]) -> Optional[datetime]:
         if v and v > datetime.now(v.tzinfo):
             raise ValueError("A data da operação não pode ser futura.")
         return v
+ 
+    @model_validator(mode="after")
+    def validar_combinacao_preco(self) -> "StockTradeCreate":
+        if self.auto_cotacao and self.stock_price is not None:
+            raise ValueError(
+                "stock_price não deve ser informado quando auto_cotacao=true. "
+                "Envie apenas um dos dois."
+            )
+        if not self.auto_cotacao and self.stock_price is None:
+            raise ValueError(
+                "stock_price é obrigatório quando auto_cotacao=false. "
+                "Informe o preço ou defina auto_cotacao=true."
+            )
+        return self
 
 class StockTradeOut(BaseModel):
     """Retorno de uma operação registrada."""

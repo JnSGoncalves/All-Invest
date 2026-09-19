@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from ..db import schemas
 from ..db.database import get_db
+from ..services import ticker_services
 from ..services.auth_services import get_current_user  # placeholder OAuth 2.0
 
 router = APIRouter(prefix="/api/stocks", tags=["stocks"])
@@ -15,44 +16,17 @@ router = APIRouter(prefix="/api/stocks", tags=["stocks"])
 # ===========================================================================
 # MOCKS TEMPORÁRIOS
 # ---------------------------------------------------------------------------
-# Serão substituídos por:
-#   - B3_TICKERS  -> consulta real à API da B3 (ou tabela `stocks` populada)
-#   - _MOCK_WALLET -> persistência real na tabela `users_stocks` via crud.py
+# A validação de ticker agora é real, via ticker_services (brapi.dev).
+# Ainda restam mockados:
+#   - MOCK_BROKERS -> consulta real à tabela `brokers`
+#   - _MOCK_WALLET  -> persistência real na tabela `users_stocks` via crud.py
 # ===========================================================================
-B3_TICKERS = {
-    "PETR4": "Petróleo Brasileiro S.A. - Petrobras",
-    "VALE3": "Vale S.A.",
-    "ITUB4": "Itaú Unibanco Holding S.A.",
-    "BBDC4": "Banco Bradesco S.A.",
-    "ABEV3": "Ambev S.A.",
-    "BBAS3": "Banco do Brasil S.A.",
-    "MGLU3": "Magazine Luiza S.A.",
-    "WEGE3": "WEG S.A.",
-    "B3SA3": "B3 S.A. - Brasil, Bolsa, Balcão",
-    "RENT3": "Localiza Rent a Car S.A.",
-}
 
 # Corretoras aceitas enquanto a tabela `brokers` não está populada
 MOCK_BROKERS = {1: "XP Investimentos", 2: "Rico", 3: "Clear", 4: "NuInvest"}
 
 # Carteira em memória: { user_id: [ {..operação..} ] }
 _MOCK_WALLET: dict[int, List[dict]] = {}
-
-
-def validar_ticker_b3(stock_name: str) -> str:
-    """
-    Mock da validação de existência da ação na B3.
-
-    Retorna o nome da empresa se o ticker existir.
-    TODO: trocar por chamada à API da B3 / brapi / consulta na tabela `stocks`.
-    """
-    ticker = stock_name.strip().upper()
-    if ticker not in B3_TICKERS:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"O ativo '{ticker}' não foi encontrado na B3.",
-        )
-    return B3_TICKERS[ticker]
 
 
 def _saldo_em_carteira(user_id: int, ticker: str) -> int:
@@ -75,7 +49,7 @@ def _saldo_em_carteira(user_id: int, ticker: str) -> int:
     response_model=schemas.StockTradeOut,
     status_code=status.HTTP_201_CREATED,
 )
-def cadastrar_operacao(
+async def cadastrar_operacao(
     trade_in: schemas.StockTradeCreate,
     db: Session = Depends(get_db),
     current_user: schemas.UserOut = Depends(get_current_user),
@@ -83,13 +57,20 @@ def cadastrar_operacao(
     """
     Cadastro de operação de compra/venda de ações na carteira do usuário.
 
-    CA01: ticker válido na B3 + dados corretos -> registra e retorna 201.
-    CA02: ticker inexistente na B3 -> 404 com mensagem clara.
+    CA01: ticker válido na B3 (brapi.dev) + dados corretos -> registra e retorna 201.
+    CA02: ticker inexistente/inativo na B3 -> 404 com mensagem clara.
     CA03: venda maior que a posição atual -> 422 (saldo insuficiente).
     CA04: corretora não cadastrada -> 400.
     """
-    ticker = trade_in.stock_name.strip().upper()
-    company_name = validar_ticker_b3(ticker)
+    ticker_info = await ticker_services.validar_ticker(trade_in.stock_name)
+    ticker = ticker_info["stock_name"]
+    company_name = ticker_info["company_name"]
+
+    # stock_price manual (auto_cotacao=False) ou buscado na B3 (auto_cotacao=True).
+    # A consistência entre os dois campos já foi validada no schema.
+    stock_price = trade_in.stock_price
+    if trade_in.auto_cotacao:
+        stock_price = await ticker_services.obter_cotacao(ticker)
 
     if trade_in.broker_id not in MOCK_BROKERS:
         raise HTTPException(
@@ -113,7 +94,7 @@ def cadastrar_operacao(
         "stock_name": ticker,
         "company_name": company_name,
         "stock_quantity": trade_in.stock_quantity,
-        "stock_price": trade_in.stock_price,
+        "stock_price": stock_price,
         "broker_id": trade_in.broker_id,
         "broker_name": MOCK_BROKERS[trade_in.broker_id],
         "trade_side": trade_in.trade_side,
@@ -180,8 +161,39 @@ def consultar_carteira(
 
 
 @router.get("/validar/{stock_name}", response_model=schemas.StockValidationOut)
-def validar_ativo(stock_name: str):
-    """Verifica se um ticker existe na B3 (mock). Útil para validação no front."""
-    ticker = stock_name.strip().upper()
-    company_name = validar_ticker_b3(ticker)
-    return {"stock_name": ticker, "company_name": company_name, "valido": True}
+async def validar_ativo(stock_name: str):
+    """Verifica se um ticker existe e está ativo na B3 (via brapi.dev). Útil para validação no front."""
+    ticker_info = await ticker_services.validar_ticker(stock_name)
+    return {
+        "stock_name": ticker_info["stock_name"],
+        "company_name": ticker_info["company_name"],
+        "valido": True,
+    }
+
+
+@router.get("/buscar", response_model=schemas.TickerListOut)
+async def buscar_tickers(
+    search: str | None = None,
+    tipo: str | None = None,
+    page: int = 1,
+    limit: int = 20,
+):
+    """
+    Lista/filtra os tickers disponíveis na B3 (screener paginado via brapi.dev).
+
+    Query params opcionais: `search` (texto livre), `tipo` (stock/fund/bdr),
+    `page` e `limit`.
+    """
+    return await ticker_services.listar_tickers(
+        search=search, tipo=tipo, page=page, limit=limit
+    )
+
+
+@router.get("/autocomplete", response_model=List[schemas.TickerAutocompleteOut])
+async def autocomplete_tickers(q: str, limit: int = 8):
+    """
+    Sugestões de tickers para autocomplete no front, conforme o usuário digita.
+
+    Exemplo: GET /api/stocks/autocomplete?q=PETR -> [{PETR3, PETR4, ...}]
+    """
+    return await ticker_services.autocomplete_tickers(q, limit=limit)
