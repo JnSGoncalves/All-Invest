@@ -25,7 +25,8 @@ jobs:
         run: |
           cat > backend/.env <<EOF
           DATABASE_URL=${{ secrets.DATABASE_URL }}
-          API_KEY=${{ secrets.API_KEY }}
+          BRAPI_URL=${{ secrets.BRAPI_URL }}
+          BRAPI_TOKEN=${{ secrets.BRAPI_TOKEN }}
           EOF
 
       - name: Criar .env do frontend
