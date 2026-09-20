@@ -4,11 +4,11 @@ from fastapi.openapi.utils import get_openapi
 from fastapi.middleware.cors import CORSMiddleware
 from .db.crud import validate_api_key
 from .db.database import SessionLocal
-from .routers import users
-from .routers import auth
 import os
 from dotenv import load_dotenv
 from starlette.middleware.sessions import SessionMiddleware
+from .routers import stocks, users, auth
+
 load_dotenv()
 
 app = FastAPI(
@@ -108,6 +108,7 @@ app.add_middleware(
 
 app.include_router(users.router)
 app.include_router(auth.router)
+app.include_router(stocks.router)
 
 
 @app.get("/health", tags=["health"])
@@ -130,14 +131,36 @@ def custom_openapi():
         "securitySchemes", {}
     )
     security_schemes["ApiKeyAuth"] = {
+    # openapi_schema.setdefault("components", {}).setdefault("securitySchemes", {})
+    # openapi_schema["components"]["securitySchemes"]["ApiKeyAuth"] = {
         "type": "apiKey",
         "in": "header",
         "name": "X-API-Key",
     }
 
-    openapi_schema["security"] = [
-        {"ApiKeyAuth": []}
-    ]
+    # Enquanto o OAuth2 ainda é placeholder (auth_services.get_current_user
+    # sempre retorna um usuário mock), removemos o esquema OAuth2 gerado
+    # automaticamente pelo FastAPI e deixamos só a ApiKeyAuth exigida.
+    # TODO: remover este bloco quando o OAuth2 for implementado de verdade.
+    OAUTH_PLACEHOLDER_ATIVO = True
+
+    for path_item in openapi_schema.get("paths", {}).values():
+        for operation in path_item.values():
+            if not isinstance(operation, dict):
+                continue
+            security = operation.get("security", [])
+            if OAUTH_PLACEHOLDER_ATIVO:
+                security = [
+                    req for req in security if "OAuth2PasswordBearer" not in req
+                ]
+            if not any("ApiKeyAuth" in req for req in security):
+                security.append({"ApiKeyAuth": []})
+            operation["security"] = security
+
+    if OAUTH_PLACEHOLDER_ATIVO:
+        openapi_schema["components"]["securitySchemes"].pop(
+            "OAuth2PasswordBearer", None
+        )
 
     public_auth_paths = {
         "/api/v1/auth/login",
@@ -160,7 +183,6 @@ def custom_openapi():
                     ]
 
     app.openapi_schema = openapi_schema
-
     return app.openapi_schema
 
 
