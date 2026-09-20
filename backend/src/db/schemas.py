@@ -1,18 +1,22 @@
 from datetime import datetime
 from decimal import Decimal
 from typing import Literal, Optional
-
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator, model_validator
 
 class UserCreate(BaseModel):
-    """Payload do formulário de cadastro (CA01)."""
     name: str = Field(min_length=1, max_length=120)
     email: EmailStr
-    password: str = Field(min_length=8, description="Mínimo de 8 caracteres")
+    password: str = Field(min_length=8, max_length=72)
+
+    @field_validator("password")
+    @classmethod
+    def validate_bcrypt_length(cls, value: str) -> str:
+        if len(value.encode("utf-8")) > 72:
+            raise ValueError("A senha deve ter no máximo 72 bytes.")
+        return value
 
 
 class UserOut(BaseModel):
-    """Retorno da API — nunca inclui password_hash."""
     model_config = ConfigDict(from_attributes=True)
 
     user_id: int
@@ -21,14 +25,31 @@ class UserOut(BaseModel):
     created_at: datetime
 
 class UserLogin(BaseModel):
-    """Payload do formulário de login (HU02 - CA01/CA02)."""
     email: EmailStr
-    password: str
+    password: str = Field(min_length=1, max_length=72)
 
-class Token(BaseModel):
-    """Resposta do login: token de sessão a ser enviado nas próximas requisições."""
+
+class TokenPair(BaseModel):
     access_token: str
+    refresh_token: str
     token_type: str = "bearer"
+    expires_in: int = Field(description="Validade do access token, em segundos")
+
+
+class AuthResponse(TokenPair):
+    user: UserOut
+
+
+class RefreshTokenRequest(BaseModel):
+    refresh_token: str = Field(min_length=32, max_length=512)
+
+
+class LogoutRequest(RefreshTokenRequest):
+    pass
+
+
+class MessageResponse(BaseModel):
+    message: str
 
 class StockTradeCreate(BaseModel):
     """Payload de cadastro de uma operação de compra/venda."""
@@ -140,3 +161,6 @@ class TickerAutocompleteOut(BaseModel):
  
     stock_name: str
     company_name: str
+      
+# Compatibilidade temporária para imports antigos.
+Token = TokenPair

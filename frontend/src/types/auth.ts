@@ -1,10 +1,24 @@
-export interface Usuario {
-  id: string;
-  nome: string;
+export interface User {
+  user_id: number;
+  name: string;
   email: string;
+  created_at: string;
 }
 
-export interface LoginResponse {
+export interface AuthResponse {
   access_token: string;
-  token_type: string;
+  refresh_token: string;
+  token_type: "bearer";
+  expires_in: number;
+  user: User;
+}
+
+export interface TokenSession {
+  accessToken: string;
+  refreshToken: string;
+  expiresAt: number;
+}
+
+export interface ApiErrorBody {
+  detail?: string;
 }
