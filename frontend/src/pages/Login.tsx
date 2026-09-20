@@ -1,16 +1,38 @@
+import { useState } from "react";
 import LoginForm from "../components/LoginForm/LoginForm";
-import { login } from "../services/api";
+import { useAuth } from "../contexts/auth-context";
 
 export default function Login() {
+  const [erro, setErro] = useState<string | null>(null);
+  const [entrandoGoogle, setEntrandoGoogle] = useState(false);
+  const { login, loginWithGoogle } = useAuth();
+
   async function handleLogin(email: string, senha: string) {
+    setErro(null);
+
     try {
-      const usuario = await login(email, senha);
-      console.log("Login OK:", usuario);
-      // aqui depois: redirecionar para o dashboard, salvar token, etc.
-    } catch (erro) {
-      console.error("Falha no login:", erro);
+      await login(email, senha);
+    } catch (erro: unknown) {
+      setErro(
+        erro instanceof Error
+          ? erro.message
+          : "Não foi possível realizar o login.",
+      );
     }
   }
 
-  return <LoginForm onSubmit={handleLogin} />;
+  function handleGoogleLogin() {
+    setErro(null);
+    setEntrandoGoogle(true);
+    loginWithGoogle();
+  }
+
+  return (
+    <LoginForm
+      onSubmit={handleLogin}
+      onGoogleLogin={handleGoogleLogin}
+      googleLoading={entrandoGoogle}
+      erro={erro}
+    />
+  );
 }

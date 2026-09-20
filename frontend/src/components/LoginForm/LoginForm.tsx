@@ -1,3 +1,4 @@
+
 import { useState, type FormEvent } from "react";
 import "./LoginForm.css";
 import logo from "../../assets/all-invest-logo.png";
@@ -8,10 +9,18 @@ interface FormErrors {
 }
 
 interface LoginFormProps {
-  onSubmit?: (email: string, senha: string) => void;
+  onSubmit: (email: string, senha: string) => Promise<void>;
+  onGoogleLogin: () => void;
+  googleLoading?: boolean;
+  erro?: string | null;
 }
 
-export default function LoginForm({ onSubmit }: LoginFormProps) {
+export default function LoginForm({
+  onSubmit,
+  onGoogleLogin,
+  googleLoading = false,
+  erro,
+}: LoginFormProps) {
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
   const [erros, setErros] = useState<FormErrors>({});
@@ -26,7 +35,7 @@ export default function LoginForm({ onSubmit }: LoginFormProps) {
 
   function validarSenha(valor: string): string | undefined {
     if (!valor) return "Informe sua senha";
-    if (valor.length < 6) return "Mínimo de 6 caracteres";
+    if (valor.length < 8) return "Mínimo de 8 caracteres";
     return undefined;
   }
 
@@ -42,14 +51,11 @@ export default function LoginForm({ onSubmit }: LoginFormProps) {
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     if (!validarCampos()) return;
-
+  
     setEnviando(true);
+  
     try {
-      if (onSubmit) {
-        await onSubmit(email, senha);
-      } else {
-        console.log("Login:", { email, senha });
-      }
+      await onSubmit(email, senha);
     } finally {
       setEnviando(false);
     }
@@ -65,6 +71,20 @@ export default function LoginForm({ onSubmit }: LoginFormProps) {
         <p className="login-subtitle">
           Acompanhe sua carteira e acesse suas posições.
         </p>
+
+        <button
+          type="button"
+          className="google-login-button"
+          onClick={onGoogleLogin}
+          disabled={googleLoading || enviando}
+        >
+          <span className="google-mark" aria-hidden="true">G</span>
+          {googleLoading ? "Abrindo Google…" : "Continuar com Google"}
+        </button>
+
+        <div className="login-divider" aria-hidden="true">
+          <span>ou entre com e-mail</span>
+        </div>
 
         <form onSubmit={handleSubmit} noValidate className="login-form">
           <div className={`field ${erros.email ? "field-error" : ""}`}>
@@ -102,13 +122,20 @@ export default function LoginForm({ onSubmit }: LoginFormProps) {
               </span>
             )}
           </div>
-
+            {erro && (
+              <p className="field-message" role="alert">
+                {erro}
+              </p>
+            )}
+            
           <button type="submit" className="login-button" disabled={enviando}>
             {enviando ? "Entrando…" : "Entrar"}
           </button>
         </form>
 
-        <p className="login-footer">Ainda não tem conta? <a href="/cadastro">Crie uma</a>.</p>
+        <p className="login-footer">
+          Ainda não tem conta? <a href="/cadastro">Crie uma</a>.
+        </p>
       </div>
     </div>
   );
