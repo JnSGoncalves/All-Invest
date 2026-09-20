@@ -6,6 +6,11 @@ services:
       dockerfile: Dockerfile
     env_file:
       - ./backend/.env
+    environment:
+      GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI:-http://localhost:4670/api/v1/auth/google/callback}
+      FRONTEND_AUTH_CALLBACK_URL: ${FRONTEND_AUTH_CALLBACK_URL:-http://localhost:4671/auth/callback}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:4671}
+      ENVIRONMENT: ${ENVIRONMENT:-development}
     ports:
       - "127.0.0.1:4670:4670"
     restart: unless-stopped
@@ -15,7 +20,7 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        VITE_API_URL: ${VITE_API_URL}
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:4670}
         VITE_API_KEY: ${VITE_API_KEY}
     ports:
       - "127.0.0.1:4671:80"
