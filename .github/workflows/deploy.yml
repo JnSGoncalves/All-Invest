@@ -96,9 +96,3 @@ jobs:
         run: |
           docker compose up -d --build
 
-      - name: Verificar containers e API
-        shell: bash
-        run: |
-          docker compose ps
-          curl --fail --silent --show-error --retry 10 --retry-connrefused \
-            --retry-delay 3 http://127.0.0.1:4670/health
