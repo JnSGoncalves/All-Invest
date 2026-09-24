@@ -1,0 +1,80 @@
+.cadastro-acao-screen {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(ellipse at top, #0e1d42 0%, var(--navy-deep) 65%);
+  padding: 32px 16px;
+  font-family: "Inter", system-ui, sans-serif;
+}
+
+.cadastro-acao-card {
+  position: relative;
+  width: 100%;
+  max-width: 380px;
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  padding: 40px 36px 32px 40px;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.cadastro-acao-card::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: linear-gradient(180deg, var(--teal-bright), var(--teal));
+}
+
+.cadastro-acao-title {
+  margin: 0 0 8px;
+  font-size: 20px;
+  color: var(--text-primary);
+}
+
+.cadastro-acao-subtitle {
+  margin: 0 0 28px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text-muted);
+  max-width: 32ch;
+}
+
+.cadastro-acao-form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.cadastro-acao-button {
+  margin-top: 8px;
+  background: var(--gold);
+  color: var(--navy-deep);
+  border: none;
+  border-radius: 4px;
+  padding: 12px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.cadastro-acao-button:hover:not(:disabled) {
+  background: var(--gold-bright);
+}
+
+.cadastro-acao-button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cadastro-acao-button {
+    transition: none;
+  }
+}
