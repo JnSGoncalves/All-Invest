@@ -10,10 +10,17 @@ interface FormErrors {
 
 interface LoginFormProps {
   onSubmit: (email: string, senha: string) => Promise<void>;
+  onGoogleLogin: () => void;
+  googleLoading?: boolean;
   erro?: string | null;
 }
 
-export default function LoginForm({ onSubmit, erro }: LoginFormProps) {
+export default function LoginForm({
+  onSubmit,
+  onGoogleLogin,
+  googleLoading = false,
+  erro,
+}: LoginFormProps) {
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
   const [erros, setErros] = useState<FormErrors>({});
@@ -28,7 +35,7 @@ export default function LoginForm({ onSubmit, erro }: LoginFormProps) {
 
   function validarSenha(valor: string): string | undefined {
     if (!valor) return "Informe sua senha";
-    if (valor.length < 6) return "Mínimo de 6 caracteres";
+    if (valor.length < 8) return "Mínimo de 8 caracteres";
     return undefined;
   }
 
@@ -64,6 +71,20 @@ export default function LoginForm({ onSubmit, erro }: LoginFormProps) {
         <p className="login-subtitle">
           Acompanhe sua carteira e acesse suas posições.
         </p>
+
+        <button
+          type="button"
+          className="google-login-button"
+          onClick={onGoogleLogin}
+          disabled={googleLoading || enviando}
+        >
+          <span className="google-mark" aria-hidden="true">G</span>
+          {googleLoading ? "Abrindo Google…" : "Continuar com Google"}
+        </button>
+
+        <div className="login-divider" aria-hidden="true">
+          <span>ou entre com e-mail</span>
+        </div>
 
         <form onSubmit={handleSubmit} noValidate className="login-form">
           <div className={`field ${erros.email ? "field-error" : ""}`}>
@@ -112,7 +133,9 @@ export default function LoginForm({ onSubmit, erro }: LoginFormProps) {
           </button>
         </form>
 
-        <p className="login-footer">Ainda não tem conta? <a href="/cadastro">Crie uma</a>.</p>
+        <p className="login-footer">
+          Ainda não tem conta? <a href="/cadastro">Crie uma</a>.
+        </p>
       </div>
     </div>
   );

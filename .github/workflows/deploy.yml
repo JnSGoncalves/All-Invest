@@ -7,6 +7,13 @@ on:
     branches:
       - main
 
+permissions:
+  contents: read
+
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
 jobs:
   deploy:
     runs-on: self-hosted
@@ -22,31 +29,70 @@ jobs:
           docker compose version
 
       - name: Criar .env do backend
+        shell: bash
         run: |
-          cat > backend/.env <<EOF
-          DATABASE_URL=${{ secrets.DATABASE_URL }}
-          BRAPI_URL=${{ secrets.BRAPI_URL }}
-          BRAPI_TOKEN=${{ secrets.BRAPI_TOKEN }}
-          EOF
+          : "${DATABASE_URL:?Secret DATABASE_URL não configurado}"
+          : "${DATABASE_POOLER_HOST:?Secret DATABASE_POOLER_HOST não configurado}"
+          : "${CLIENT_ID:?Secret CLIENT_ID não configurado}"
+          : "${CLIENT_SECRET:?Secret CLIENT_SECRET não configurado}"
+          : "${SECRET_KEY:?Secret SECRET_KEY não configurado}"
+          : "${SESSION_SECRET_KEY:?Secret SESSION_SECRET_KEY não configurado}"
+
+          printf '%s\n' \
+            "DATABASE_URL=$DATABASE_URL" \
+            "DATABASE_POOLER_HOST=$DATABASE_POOLER_HOST" \
+            "CLIENT_ID=$CLIENT_ID" \
+            "CLIENT_SECRET=$CLIENT_SECRET" \
+            "SECRET_KEY=$SECRET_KEY" \
+            "SESSION_SECRET_KEY=$SESSION_SECRET_KEY" \
+            "ACCESS_TOKEN_EXPIRE_MINUTES=60" \
+            "REFRESH_TOKEN_EXPIRE_DAYS=30" \
+            > backend/.env
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DATABASE_POOLER_HOST: ${{ secrets.DATABASE_POOLER_HOST }}
+          CLIENT_ID: ${{ secrets.CLIENT_ID }}
+          CLIENT_SECRET: ${{ secrets.CLIENT_SECRET }}
+          SECRET_KEY: ${{ secrets.SECRET_KEY }}
+          SESSION_SECRET_KEY: ${{ secrets.SESSION_SECRET_KEY }}
+          BRAPI_URL: ${{ secrets.BRAPI_URL }}
+          BRAPI_TOKEN: ${{ secrets.BRAPI_TOKEN }}
 
       - name: Criar .env do frontend
+        shell: bash
         run: |
-          cat > frontend/.env <<EOF
-          VITE_API_URL=${{ secrets.VITE_API_URL }}
-          VITE_API_KEY=${{ secrets.API_KEY }}
-          EOF
+          : "${API_KEY:?Secret API_KEY não configurado}"
+
+          printf '%s\n' \
+            "VITE_API_URL=$VITE_API_URL" \
+            "VITE_API_KEY=$API_KEY" \
+            > frontend/.env
+        env:
+          VITE_API_URL: https://allinvest-api.ojota.dev.br
+          API_KEY: ${{ secrets.API_KEY }}
 
       - name: Criar .env do Docker Compose
+        shell: bash
         run: |
-          cat > .env <<EOF
-          VITE_API_URL=${{ secrets.VITE_API_URL }}
-          VITE_API_KEY=${{ secrets.API_KEY }}
-          EOF
+          : "${API_KEY:?Secret API_KEY não configurado}"
+
+          printf '%s\n' \
+            "VITE_API_URL=$VITE_API_URL" \
+            "VITE_API_KEY=$API_KEY" \
+            "GOOGLE_REDIRECT_URI=$GOOGLE_REDIRECT_URI" \
+            "FRONTEND_AUTH_CALLBACK_URL=$FRONTEND_AUTH_CALLBACK_URL" \
+            "CORS_ORIGINS=$CORS_ORIGINS" \
+            "ENVIRONMENT=production" \
+            > .env
+        env:
+          VITE_API_URL: https://allinvest-api.ojota.dev.br
+          API_KEY: ${{ secrets.API_KEY }}
+          GOOGLE_REDIRECT_URI: https://allinvest-api.ojota.dev.br/api/v1/auth/google/callback
+          FRONTEND_AUTH_CALLBACK_URL: https://allinvest.ojota.dev.br/auth/callback
+          CORS_ORIGINS: https://allinvest.ojota.dev.br
 
       - name: Build e deploy
+        shell: bash
         run: |
           docker compose up -d --build
 
-      - name: Verificar containers
-        run: |
-          docker compose ps

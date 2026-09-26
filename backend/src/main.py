@@ -2,29 +2,54 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.openapi.utils import get_openapi
 from fastapi.middleware.cors import CORSMiddleware
-
 from .db.crud import validate_api_key
 from .db.database import SessionLocal
-from .routers import stocks, users, auth
-
+from .routers import users
+from .routers import auth
+import os
+from dotenv import load_dotenv
+from starlette.middleware.sessions import SessionMiddleware
+load_dotenv()
 
 app = FastAPI(
     title="All Invest API",
-    description="API do HUB unificado de investimentos All Invest.",
+    description="""
+API do HUB unificado de investimentos All Invest.
+
+### Testar login com Google
+
+O OAuth não pode ser iniciado pelo botão **Execute** do Swagger, pois ele usa
+`fetch` e o redirecionamento externo do Google é bloqueado pelo navegador.
+
+<a href="/api/v1/auth/google" target="_blank"><strong>▶ Abrir login com Google em uma nova aba</strong></a>
+
+Depois do login, o callback exibirá o `access_token` e o `refresh_token`.
+""",
     version="0.1.0",
 )
 
 
 @app.middleware("http")
 async def verify_api_key(request: Request, call_next):
-    public_routes = [
+    public_routes = {
         "/docs",
         "/openapi.json",
         "/redoc",
         "/health",
-    ]
+    }
+    public_prefixes = ("/api/v1/auth",)
+    request_path = request.url.path.rstrip("/") or "/"
 
-    if request.url.path in public_routes:
+    # O preflight CORS não envia X-API-Key. Todas as rotas de autenticação
+    # também precisam ser públicas para que o usuário consiga entrar.
+    if (
+        request.method == "OPTIONS"
+        or request_path in public_routes
+        or any(
+            request_path == prefix or request_path.startswith(f"{prefix}/")
+            for prefix in public_prefixes
+        )
+    ):
         return await call_next(request)
 
     api_key = request.headers.get("X-API-Key")
@@ -49,23 +74,40 @@ async def verify_api_key(request: Request, call_next):
     finally:
         db.close()
 
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=os.getenv(
+        "SESSION_SECRET_KEY",
+        os.getenv("SECRET_KEY", "chave-de-desenvolvimento-troque-em-producao"),
+    ),
+    session_cookie="allinvest_oauth_session",
+    max_age=600,
+    same_site="lax",
+    https_only=os.getenv("ENVIRONMENT", "development").lower() == "production",
+)
 
         
+default_cors_origins = [
+    "http://localhost:5173",
+    "http://localhost:4671",
+]
+cors_origins = [
+    origin.strip().rstrip("/")
+    for origin in os.getenv("CORS_ORIGINS", ",".join(default_cors_origins)).split(",")
+    if origin.strip()
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",  # Frontend pelo Vite
-        "http://localhost:4671",  # Frontend pelo Docker
-    ],
-    allow_credentials=False,
-    allow_methods=["GET", "POST"],
+    allow_origins=cors_origins,
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Content-Type", "X-API-Key", "Authorization"],
 )
 
 
 app.include_router(users.router)
 app.include_router(auth.router)
-app.include_router(stocks.router)
 
 
 @app.get("/health", tags=["health"])
@@ -84,38 +126,41 @@ def custom_openapi():
         routes=app.routes,
     )
 
-    openapi_schema.setdefault("components", {}).setdefault("securitySchemes", {})
-    openapi_schema["components"]["securitySchemes"]["ApiKeyAuth"] = {
+    security_schemes = openapi_schema.setdefault("components", {}).setdefault(
+        "securitySchemes", {}
+    )
+    security_schemes["ApiKeyAuth"] = {
         "type": "apiKey",
         "in": "header",
         "name": "X-API-Key",
     }
 
-    # Enquanto o OAuth2 ainda é placeholder (auth_services.get_current_user
-    # sempre retorna um usuário mock), removemos o esquema OAuth2 gerado
-    # automaticamente pelo FastAPI e deixamos só a ApiKeyAuth exigida.
-    # TODO: remover este bloco quando o OAuth2 for implementado de verdade.
-    OAUTH_PLACEHOLDER_ATIVO = True
+    openapi_schema["security"] = [
+        {"ApiKeyAuth": []}
+    ]
 
-    for path_item in openapi_schema.get("paths", {}).values():
+    public_auth_paths = {
+        "/api/v1/auth/login",
+        "/api/v1/auth/refresh",
+        "/api/v1/auth/google",
+        "/api/v1/auth/google/callback",
+    }
+
+    for public_path, path_item in openapi_schema.get("paths", {}).items():
         for operation in path_item.values():
-            if not isinstance(operation, dict):
+            if not isinstance(operation, dict) or "responses" not in operation:
                 continue
-            security = operation.get("security", [])
-            if OAUTH_PLACEHOLDER_ATIVO:
-                security = [
-                    req for req in security if "OAuth2PasswordBearer" not in req
-                ]
-            if not any("ApiKeyAuth" in req for req in security):
-                security.append({"ApiKeyAuth": []})
-            operation["security"] = security
-
-    if OAUTH_PLACEHOLDER_ATIVO:
-        openapi_schema["components"]["securitySchemes"].pop(
-            "OAuth2PasswordBearer", None
-        )
+            if public_path == "/health" or public_path in public_auth_paths:
+                operation["security"] = []
+            elif not public_path.startswith("/api/v1/auth"):
+                requirements = operation.get("security", [])
+                if any("BearerAuth" in requirement for requirement in requirements):
+                    operation["security"] = [
+                        {"ApiKeyAuth": [], "BearerAuth": []}
+                    ]
 
     app.openapi_schema = openapi_schema
+
     return app.openapi_schema
 
 

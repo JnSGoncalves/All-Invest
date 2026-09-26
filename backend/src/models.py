@@ -1,4 +1,15 @@
-from sqlalchemy import CheckConstraint, Column, Integer, String, Numeric, ForeignKey, DateTime, func
+from sqlalchemy import (
+    BigInteger,
+    CheckConstraint,
+    Column,
+    DateTime,
+    ForeignKey,
+    Integer,
+    Numeric,
+    String,
+    Text,
+    func,
+)
 from sqlalchemy.orm import relationship
 
 from .db.database import Base
@@ -27,6 +38,34 @@ class User(Base):
 
     stocks = relationship("UserStock", back_populates="user")
     brokers = relationship("UserBroker", back_populates="user")
+    refresh_tokens = relationship(
+        "RefreshToken",
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
+
+
+class RefreshToken(Base):
+    """Sessão renovável conforme a tabela refresh_tokens do DER."""
+
+    __tablename__ = "refresh_tokens"
+
+    token_id = Column(BigInteger, primary_key=True, autoincrement=True)
+    user_id = Column(
+        Integer,
+        ForeignKey("users.user_id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    token_hash = Column(Text, nullable=False, unique=True, index=True)
+    expire_at = Column(DateTime(timezone=True), nullable=False)
+    created_at = Column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+    )
+
+    user = relationship("User", back_populates="refresh_tokens")
 
 
 # ---------------------------------------------------------------------------
