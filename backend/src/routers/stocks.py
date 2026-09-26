@@ -1,199 +1,158 @@
 from datetime import datetime, timezone
 from decimal import Decimal
-from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
-from ..db import schemas
+from ..db import crud, schemas
 from ..db.database import get_db
+from ..dependencies.auth import CurrentUser
 from ..services import ticker_services
-from ..services.auth_services import get_current_user  # placeholder OAuth 2.0
 
 router = APIRouter(prefix="/api/stocks", tags=["stocks"])
 
-
-# ===========================================================================
-# MOCKS TEMPORÁRIOS
-# ---------------------------------------------------------------------------
-# A validação de ticker agora é real, via ticker_services (brapi.dev).
-# Ainda restam mockados:
-#   - MOCK_BROKERS -> consulta real à tabela `brokers`
-#   - _MOCK_WALLET  -> persistência real na tabela `users_stocks` via crud.py
-# ===========================================================================
-
-# Corretoras aceitas enquanto a tabela `brokers` não está populada
+# Catálogo provisório até existir o cadastro de corretoras. As operações, no
+# entanto, são persistidas com a corretora correspondente no Supabase.
 MOCK_BROKERS = {1: "XP Investimentos", 2: "Rico", 3: "Clear", 4: "NuInvest"}
-
-# Carteira em memória: { user_id: [ {..operação..} ] }
-_MOCK_WALLET: dict[int, List[dict]] = {}
+BROKER_IDS_BY_NAME = {name: broker_id for broker_id, name in MOCK_BROKERS.items()}
 
 
-def _saldo_em_carteira(user_id: int, ticker: str) -> int:
-    """Calcula a quantidade líquida (compras - vendas) de um ativo na carteira mock."""
-    operacoes = _MOCK_WALLET.get(user_id, [])
-    return sum(
-        op["stock_quantity"] if op["trade_side"] == "BUY" else -op["stock_quantity"]
-        for op in operacoes
-        if op["stock_name"] == ticker
-    )
+def _trade_out(trade) -> dict:
+    return {
+        "stock_name": trade.stock.stock_name,
+        "company_name": trade.stock.company_name,
+        "stock_quantity": trade.stock_quantity,
+        "stock_price": trade.stock_price,
+        # O contrato público usa o ID provisório do catálogo mockado, e não
+        # a chave interna que o Supabase atribuiu à corretora.
+        "broker_id": BROKER_IDS_BY_NAME.get(
+            trade.broker.broker_name, trade.broker_id
+        ),
+        "broker_name": trade.broker.broker_name,
+        "trade_side": trade.trade_side,
+        "trade_date": trade.trade_date,
+    }
 
 
-# ===========================================================================
-# ENDPOINTS
-# ===========================================================================
-
-
-@router.post(
-    "",
-    response_model=schemas.StockTradeOut,
-    status_code=status.HTTP_201_CREATED,
-)
+@router.post("", response_model=schemas.StockTradeOut, status_code=status.HTTP_201_CREATED)
 async def cadastrar_operacao(
     trade_in: schemas.StockTradeCreate,
+    current_user: CurrentUser,
     db: Session = Depends(get_db),
-    current_user: schemas.UserOut = Depends(get_current_user),
 ):
-    """
-    Cadastro de operação de compra/venda de ações na carteira do usuário.
-
-    CA01: ticker válido na B3 (brapi.dev) + dados corretos -> registra e retorna 201.
-    CA02: ticker inexistente/inativo na B3 -> 404 com mensagem clara.
-    CA03: venda maior que a posição atual -> 422 (saldo insuficiente).
-    CA04: corretora não cadastrada -> 400.
-    """
+    """Registra uma compra ou venda do usuário identificado pelo Bearer JWT."""
     ticker_info = await ticker_services.validar_ticker(trade_in.stock_name)
     ticker = ticker_info["stock_name"]
     company_name = ticker_info["company_name"]
+    stock_price = (
+        await ticker_services.obter_cotacao(ticker)
+        if trade_in.auto_cotacao
+        else trade_in.stock_price
+    )
 
-    # stock_price manual (auto_cotacao=False) ou buscado na B3 (auto_cotacao=True).
-    # A consistência entre os dois campos já foi validada no schema.
-    stock_price = trade_in.stock_price
-    if trade_in.auto_cotacao:
-        stock_price = await ticker_services.obter_cotacao(ticker)
+    broker_name = MOCK_BROKERS.get(trade_in.broker_id)
+    if broker_name is None:
+        raise HTTPException(status_code=400, detail="Corretora não cadastrada.")
 
-    if trade_in.broker_id not in MOCK_BROKERS:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Corretora não cadastrada para este usuário.",
-        )
-
-    if trade_in.trade_side == "SELL":
-        saldo_atual = _saldo_em_carteira(current_user.user_id, ticker)
-        if trade_in.stock_quantity > saldo_atual:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=(
-                    f"Saldo insuficiente para venda. Posição atual de {ticker}: "
-                    f"{saldo_atual} ação(ões)."
-                ),
+    try:
+        # FOR UPDATE protege a checagem contra duas vendas simultâneas.
+        if trade_in.trade_side == "SELL":
+            balance = crud.get_user_stock_balance(
+                db, user_id=current_user.user_id, stock_name=ticker, lock=True
             )
+            if trade_in.stock_quantity > balance:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail=(f"Saldo insuficiente para venda. Posição atual de {ticker}: "
+                            f"{balance} ação(ões)."),
+                )
 
-    operacao = {
-        "user_id": current_user.user_id,
-        "stock_name": ticker,
-        "company_name": company_name,
-        "stock_quantity": trade_in.stock_quantity,
-        "stock_price": stock_price,
-        "broker_id": trade_in.broker_id,
-        "broker_name": MOCK_BROKERS[trade_in.broker_id],
-        "trade_side": trade_in.trade_side,
-        "trade_date": trade_in.trade_date or datetime.now(timezone.utc),
-    }
-
-    # TODO: substituir pelo insert real:
-    #   return crud.create_user_stock(db, current_user.user_id, trade_in)
-    _MOCK_WALLET.setdefault(current_user.user_id, []).append(operacao)
-
-    return operacao
-
-
-@router.get("", response_model=List[schemas.StockTradeOut])
-def listar_operacoes(
-    db: Session = Depends(get_db),
-    current_user: schemas.UserOut = Depends(get_current_user),
-):
-    """Lista todas as operações registradas na carteira do usuário autenticado."""
-    # TODO: substituir por crud.get_user_stocks(db, current_user.user_id)
-    return _MOCK_WALLET.get(current_user.user_id, [])
-
-
-@router.get("/carteira", response_model=List[schemas.PositionOut])
-def consultar_carteira(
-    db: Session = Depends(get_db),
-    current_user: schemas.UserOut = Depends(get_current_user),
-):
-    """Retorna a posição consolidada (quantidade líquida e preço médio) por ativo."""
-    operacoes = _MOCK_WALLET.get(current_user.user_id, [])
-    posicoes: dict[str, dict] = {}
-
-    for op in operacoes:
-        pos = posicoes.setdefault(
-            op["stock_name"],
-            {
-                "stock_name": op["stock_name"],
-                "company_name": op["company_name"],
-                "stock_quantity": 0,
-                "custo_total": Decimal("0"),
-            },
+        stock = crud.get_or_create_stock(db, ticker, company_name)
+        broker = crud.get_or_create_broker(db, broker_name)
+        crud.ensure_user_broker(
+            db, user_id=current_user.user_id, broker_id=broker.broker_id
         )
-        if op["trade_side"] == "BUY":
-            pos["stock_quantity"] += op["stock_quantity"]
-            pos["custo_total"] += Decimal(str(op["stock_price"])) * op["stock_quantity"]
-        else:
-            pos["stock_quantity"] -= op["stock_quantity"]
-            pos["custo_total"] -= Decimal(str(op["stock_price"])) * op["stock_quantity"]
+        trade = crud.create_user_stock(
+            db,
+            user_id=current_user.user_id,
+            stock_id=stock.stock_id,
+            broker_id=broker.broker_id,
+            stock_quantity=trade_in.stock_quantity,
+            stock_price=stock_price,
+            trade_side=trade_in.trade_side,
+            trade_date=trade_in.trade_date or datetime.now(timezone.utc),
+        )
+    except HTTPException:
+        db.rollback()
+        raise
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Já existe uma operação com o mesmo ativo e horário.",
+        ) from exc
+    except SQLAlchemyError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Não foi possível salvar a operação. Tente novamente.",
+        ) from exc
+
+    return _trade_out(trade)
+
+
+@router.get("", response_model=list[schemas.StockTradeOut])
+def listar_operacoes(current_user: CurrentUser, db: Session = Depends(get_db)):
+    """Lista as operações persistidas da carteira autenticada."""
+    return [_trade_out(trade) for trade in crud.get_user_stock_trades(db, current_user.user_id)]
+
+
+@router.get("/carteira", response_model=list[schemas.PositionOut])
+def consultar_carteira(current_user: CurrentUser, db: Session = Depends(get_db)):
+    """Consolida quantidade e preço médio a partir das operações persistidas."""
+    positions: dict[str, dict] = {}
+    for trade in reversed(crud.get_user_stock_trades(db, current_user.user_id)):
+        ticker = trade.stock.stock_name
+        position = positions.setdefault(
+            ticker,
+            {"stock_name": ticker, "company_name": trade.stock.company_name,
+             "stock_quantity": 0, "cost_basis": Decimal("0")},
+        )
+        if trade.trade_side == "BUY":
+            position["stock_quantity"] += trade.stock_quantity
+            position["cost_basis"] += trade.stock_price * trade.stock_quantity
+        elif position["stock_quantity"]:
+            average = position["cost_basis"] / position["stock_quantity"]
+            position["stock_quantity"] -= trade.stock_quantity
+            position["cost_basis"] -= average * trade.stock_quantity
 
     return [
         {
-            "stock_name": p["stock_name"],
-            "company_name": p["company_name"],
-            "stock_quantity": p["stock_quantity"],
-            "preco_medio": (
-                (p["custo_total"] / p["stock_quantity"]).quantize(Decimal("0.0001"))
-                if p["stock_quantity"] > 0
-                else Decimal("0")
-            ),
+            "stock_name": position["stock_name"],
+            "company_name": position["company_name"],
+            "stock_quantity": position["stock_quantity"],
+            "preco_medio": (position["cost_basis"] / position["stock_quantity"])
+            .quantize(Decimal("0.0001")),
         }
-        for p in posicoes.values()
-        if p["stock_quantity"] != 0
+        for position in positions.values()
+        if position["stock_quantity"] > 0
     ]
 
 
 @router.get("/validar/{stock_name}", response_model=schemas.StockValidationOut)
 async def validar_ativo(stock_name: str):
-    """Verifica se um ticker existe e está ativo na B3 (via brapi.dev). Útil para validação no front."""
+    """Verifica se um ticker existe e está ativo na B3."""
     ticker_info = await ticker_services.validar_ticker(stock_name)
-    return {
-        "stock_name": ticker_info["stock_name"],
-        "company_name": ticker_info["company_name"],
-        "valido": True,
-    }
+    return {**ticker_info, "valido": True}
 
 
 @router.get("/buscar", response_model=schemas.TickerListOut)
-async def buscar_tickers(
-    search: str | None = None,
-    tipo: str | None = None,
-    page: int = 1,
-    limit: int = 20,
-):
-    """
-    Lista/filtra os tickers disponíveis na B3 (screener paginado via brapi.dev).
-
-    Query params opcionais: `search` (texto livre), `tipo` (stock/fund/bdr),
-    `page` e `limit`.
-    """
-    return await ticker_services.listar_tickers(
-        search=search, tipo=tipo, page=page, limit=limit
-    )
+async def buscar_tickers(search: str | None = None, tipo: str | None = None,
+                         page: int = 1, limit: int = 20):
+    return await ticker_services.listar_tickers(search=search, tipo=tipo, page=page, limit=limit)
 
 
-@router.get("/autocomplete", response_model=List[schemas.TickerAutocompleteOut])
+@router.get("/autocomplete", response_model=list[schemas.TickerAutocompleteOut])
 async def autocomplete_tickers(q: str, limit: int = 8):
-    """
-    Sugestões de tickers para autocomplete no front, conforme o usuário digita.
-
-    Exemplo: GET /api/stocks/autocomplete?q=PETR -> [{PETR3, PETR4, ...}]
-    """
     return await ticker_services.autocomplete_tickers(q, limit=limit)

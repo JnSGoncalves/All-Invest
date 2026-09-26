@@ -6,6 +6,7 @@ from .db.crud import validate_api_key
 from .db.database import SessionLocal
 from .routers import users
 from .routers import auth
+from .routers import stocks
 import os
 from dotenv import load_dotenv
 from starlette.middleware.sessions import SessionMiddleware
@@ -108,6 +109,7 @@ app.add_middleware(
 
 app.include_router(users.router)
 app.include_router(auth.router)
+app.include_router(stocks.router)
 
 
 @app.get("/health", tags=["health"])

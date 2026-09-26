@@ -19,22 +19,25 @@ from fastapi import HTTPException, status
 
 BRAPI_URL = os.getenv("BRAPI_URL", "https://brapi.dev/api/v2")
 BRAPI_TOKEN = os.getenv("BRAPI_TOKEN")
-
-if not BRAPI_TOKEN:
-    raise RuntimeError(
-        "BRAPI_TOKEN não configurado. Defina a variável no arquivo .env."
-    )
-
-_HEADERS = {"Authorization": f"Bearer {BRAPI_TOKEN}"}
 _TIMEOUT = httpx.Timeout(10.0, connect=5.0)
 
 
 async def _get(path: str, params: dict) -> dict:
     """Wrapper de requisição GET com tratamento de erros de rede/HTTP."""
+    if not BRAPI_TOKEN:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="BRAPI_TOKEN não configurado no servidor.",
+        )
+
     url = f"{BRAPI_URL}{path}"
     try:
         async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
-            response = await client.get(url, headers=_HEADERS, params=params)
+            response = await client.get(
+                url,
+                headers={"Authorization": f"Bearer {BRAPI_TOKEN}"},
+                params=params,
+            )
     except httpx.TimeoutException:
         raise HTTPException(
             status_code=status.HTTP_504_GATEWAY_TIMEOUT,

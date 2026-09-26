@@ -1,7 +1,9 @@
 import secrets
 from datetime import datetime
+from decimal import Decimal
 
-from sqlalchemy import delete
+from sqlalchemy import delete, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from ..services import security
@@ -101,3 +103,141 @@ def revoke_all_refresh_tokens(db: Session, user_id: int) -> int:
     )
     db.commit()
     return int(result.rowcount or 0)
+
+
+# ===========================================================================
+# Stocks / Brokers / UserStocks
+# ---------------------------------------------------------------------------
+# Suporte ao cadastro de operações (routers/stocks.py). O ticker em si já é
+# validado na B3 via services/ticker_services.py (brapi.dev); as funções
+# abaixo só garantem a linha correspondente no catálogo local (`stocks`,
+# `brokers`) para satisfazer as FKs de `users_stocks`.
+# ===========================================================================
+
+
+def get_stock_by_name(db: Session, stock_name: str) -> models.Stock | None:
+    return db.query(models.Stock).filter(models.Stock.stock_name == stock_name).first()
+
+
+def get_or_create_stock(db: Session, stock_name: str, company_name: str) -> models.Stock:
+    """
+    Retorna a linha de `stocks` para o ticker, criando-a se ainda não
+    existir no catálogo local.
+    """
+    stock = get_stock_by_name(db, stock_name)
+    if stock:
+        return stock
+
+    try:
+        with db.begin_nested():
+            stock = models.Stock(stock_name=stock_name, company_name=company_name)
+            db.add(stock)
+            db.flush()
+    except IntegrityError:
+        # Outra transação criou o mesmo ticker enquanto esta era processada.
+        stock = get_stock_by_name(db, stock_name)
+        if not stock:
+            raise
+    return stock
+
+
+def get_broker_by_name(db: Session, broker_name: str) -> models.Broker | None:
+    return (
+        db.query(models.Broker)
+        .filter(models.Broker.broker_name == broker_name)
+        .first()
+    )
+
+
+def get_or_create_broker(db: Session, broker_name: str) -> models.Broker:
+    """Garante a corretora usada pelo catálogo temporário no banco."""
+    broker = get_broker_by_name(db, broker_name)
+    if broker:
+        return broker
+
+    try:
+        with db.begin_nested():
+            broker = models.Broker(broker_name=broker_name)
+            db.add(broker)
+            db.flush()
+    except IntegrityError:
+        broker = get_broker_by_name(db, broker_name)
+        if not broker:
+            raise
+    return broker
+
+
+def get_broker_by_id(db: Session, broker_id: int) -> models.Broker | None:
+    return db.get(models.Broker, broker_id)
+
+
+def ensure_user_broker(db: Session, *, user_id: int, broker_id: int) -> None:
+    """Vincula a corretora existente à carteira do usuário, se necessário."""
+    association = db.get(models.UserBroker, (broker_id, user_id))
+    if association is None:
+        db.add(models.UserBroker(broker_id=broker_id, user_id=user_id))
+        db.flush()
+
+
+def get_user_stock_balance(
+    db: Session, *, user_id: int, stock_name: str, lock: bool = False
+) -> int:
+    """Quantidade líquida de um ativo; `lock` evita vendas concorrentes acima do saldo."""
+    statement = (
+        select(models.UserStock)
+        .join(models.Stock, models.Stock.stock_id == models.UserStock.stock_id)
+        .where(
+            models.UserStock.user_id == user_id,
+            models.Stock.stock_name == stock_name,
+        )
+    )
+    if lock:
+        statement = statement.with_for_update()
+
+    return sum(
+        trade.stock_quantity if trade.trade_side == "BUY" else -trade.stock_quantity
+        for trade in db.scalars(statement)
+    )
+
+
+def get_user_stock_trades(db: Session, user_id: int) -> list[models.UserStock]:
+    """Retorna operações da carteira com os relacionamentos necessários carregados."""
+    statement = (
+        select(models.UserStock)
+        .where(models.UserStock.user_id == user_id)
+        .order_by(models.UserStock.trade_date.desc())
+    )
+    return list(db.scalars(statement))
+
+
+def create_user_stock(
+    db: Session,
+    *,
+    user_id: int,
+    stock_id: int,
+    broker_id: int,
+    stock_quantity: int,
+    stock_price: Decimal,
+    trade_side: str,
+    trade_date: datetime,
+) -> models.UserStock:
+    """
+    Persiste uma operação de compra/venda em `users_stocks`.
+
+    Commit único: como get_or_create_stock/broker usam apenas flush(), a
+    linha nova de stocks/brokers (se houver) e a operação em si são
+    gravadas juntas, na mesma transação.
+    """
+    user_stock = models.UserStock(
+        user_id=user_id,
+        stock_id=stock_id,
+        broker_id=broker_id,
+        stock_quantity=stock_quantity,
+        stock_price=stock_price,
+        trade_side=trade_side,
+        trade_date=trade_date,
+    )
+    db.add(user_stock)
+    db.commit()
+    db.refresh(user_stock)
+    return user_stock
