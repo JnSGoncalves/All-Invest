@@ -109,7 +109,7 @@ def revoke_all_refresh_tokens(db: Session, user_id: int) -> int:
 # Stocks / Brokers / UserStocks
 # ---------------------------------------------------------------------------
 # Suporte ao cadastro de operações (routers/stocks.py). O ticker em si já é
-# validado na B3 via services/ticker_services.py (brapi.dev); as funções
+# validado na B3 via services/market_data_service.py (brapi.dev); as funções
 # abaixo só garantem a linha correspondente no catálogo local (`stocks`,
 # `brokers`) para satisfazer as FKs de `users_stocks`.
 # ===========================================================================
