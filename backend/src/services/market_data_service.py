@@ -1,5 +1,5 @@
 """
-services/ticker_services.py
+services/market_data_service.py
 
 Integração com a brapi.dev para:
   - validar se um ticker existe e está ativo na B3 antes do cadastro
@@ -196,3 +196,27 @@ async def autocomplete_tickers(query: str, limit: int = 8) -> list[dict]:
         for item in data.get("results", [])
         if item.get("isActive", True)
     ]
+
+
+class BrapiMarketDataService:
+    """Implementação brapi.dev do contrato do componente Market Data."""
+
+    async def validate_ticker(self, stock_name: str) -> dict:
+        return await validar_ticker(stock_name)
+
+    async def get_quote(self, stock_name: str) -> Decimal:
+        return await obter_cotacao(stock_name)
+
+    async def list_tickers(
+        self,
+        search: Optional[str] = None,
+        tipo: Optional[str] = None,
+        page: int = 1,
+        limit: int = 20,
+    ) -> dict:
+        return await listar_tickers(search=search, tipo=tipo, page=page, limit=limit)
+
+    async def autocomplete_tickers(
+        self, query: str, limit: int = 8
+    ) -> list[dict]:
+        return await autocomplete_tickers(query, limit=limit)
