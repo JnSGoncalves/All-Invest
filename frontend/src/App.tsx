@@ -6,7 +6,7 @@ import { useAuth } from "./contexts/auth-context";
 import "./App.css";
 
 function AuthenticatedApp() {
-  const { user, loading } = useAuth();
+  const { user, loading, sessionError, retrySession } = useAuth();
 
   if (loading) {
     return (
@@ -16,7 +16,19 @@ function AuthenticatedApp() {
     );
   }
 
-  return user ? <Home /> : <Login />;
+  if (sessionError) {
+    return (
+      <main className="auth-status-screen">
+        <section className="auth-status-card" role="alert">
+          <h1>Não foi possível acessar sua conta</h1>
+          <p>{sessionError}</p>
+          <button type="button" className="primary-button" onClick={retrySession}>Tentar novamente</button>
+        </section>
+      </main>
+    );
+  }
+
+  return user ? <Home key={user.user_id} /> : <Login />;
 }
 
 function App() {
