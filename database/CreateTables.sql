@@ -1,4 +1,4 @@
--- Schema PostgreSQL conforme modelo relacional.
+-- Schema PostgreSQL conforme modelo relacional + refresh_tokens.
 
 CREATE TABLE api_keys (
     project_id SERIAL PRIMARY KEY,
