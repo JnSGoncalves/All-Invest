@@ -203,6 +203,9 @@ cython_debug/
 # Temporary file for partial code execution
 tempCodeRunnerFile.py
 
+# Automação local de smoke test da API (pode conter configurações locais)
+/api-flow-smoke/
+
 # Ruff stuff:
 .ruff_cache/
 
@@ -472,3 +475,5 @@ venv/
 # OS
 .DS_Store
 Thumbs.db
+**/node_modules/
+**/api-flow-smoke/
