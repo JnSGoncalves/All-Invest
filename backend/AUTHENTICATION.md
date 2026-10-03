@@ -2,13 +2,15 @@
 
 Base URL: `/api/v1/auth`.
 
-## Endpoints públicos
+## Endpoints de autenticação
 
-- `POST /login`: autentica e devolve usuário, access token e refresh token.
-- `POST /refresh`: rotaciona um refresh token válido. O token anterior deixa de
-  funcionar imediatamente.
-- `GET /google`: inicia o OpenID Connect com Google.
-- `GET /google/callback`: conclui o Google e emite o mesmo contrato do login.
+- `POST /login`: exige `X-API-Key`; autentica e devolve usuário, access token e
+  refresh token.
+- `POST /refresh`: exige `X-API-Key`; rotaciona um refresh token válido. O token
+  anterior deixa de funcionar imediatamente.
+- `GET /google` e `GET /google/callback`: iniciam e concluem o OpenID Connect.
+  São as únicas rotas de auth dispensadas da API key porque o redirecionamento
+  do navegador e a chamada de retorno do Google não enviam esse cabeçalho.
 
 ## Endpoints autenticados
 
@@ -59,9 +61,10 @@ def obter_carteira(current_user=Depends(get_current_user)):
     return {"user_id": current_user.user_id}
 ```
 
-Endpoints de regra de negócio continuam exigindo também `X-API-Key` pelo
-middleware global. As rotas de autenticação são dispensadas da API key; as rotas
-`/me` e `/logout*` exigem Bearer pela dependência.
+Todos os endpoints exigem `X-API-Key` pelo middleware global, exceto health,
+documentação e as duas rotas de redirecionamento Google descritas acima. As
+rotas `/me` e `/logout*` exigem também Bearer pela dependência; `/login` e
+`/refresh` exigem a API key mesmo sem sessão de usuário.
 
 ## Variáveis
 
