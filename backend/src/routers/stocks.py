@@ -5,11 +5,15 @@ from ..dependencies.components import (
     get_investment_service,
     get_market_data_service,
 )
-from ..dependencies.auth import CurrentUser
+from ..dependencies.auth import CurrentUser, get_current_user
 from ..interfaces import IInvestmentService, IMarketDataService
 from ..services.investment_catalog import BROKER_IDS_BY_NAME
 
-router = APIRouter(prefix="/api/stocks", tags=["stocks"])
+router = APIRouter(
+    prefix="/api/stocks",
+    tags=["stocks"],
+    dependencies=[Depends(get_current_user)],
+)
 
 
 def _trade_out(trade) -> dict:
@@ -40,6 +44,17 @@ async def cadastrar_operacao(
     return _trade_out(trade)
 
 
+@router.delete("/{stock_name}", response_model=schemas.MessageResponse)
+def remover_ativo(
+    stock_name: str,
+    current_user: CurrentUser,
+    investment_service: IInvestmentService = Depends(get_investment_service),
+):
+    """Remove o ativo e seu histórico da carteira do usuário autenticado."""
+    investment_service.remove_position(current_user.user_id, stock_name)
+    return schemas.MessageResponse(message="Ativo removido da carteira.")
+
+
 @router.get("", response_model=list[schemas.StockTradeOut])
 def listar_operacoes(
     current_user: CurrentUser,
@@ -55,10 +70,24 @@ def listar_operacoes(
 @router.get("/carteira", response_model=list[schemas.PositionOut])
 def consultar_carteira(
     current_user: CurrentUser,
+    portfolio_id: int | None = None,
     investment_service: IInvestmentService = Depends(get_investment_service),
 ):
-    """Consolida quantidade e preço médio a partir das operações persistidas."""
-    return investment_service.get_positions(current_user.user_id)
+    """Consolida quantidade e preço médio; `portfolio_id` filtra por carteira."""
+    return investment_service.get_positions(current_user.user_id, portfolio_id)
+
+
+@router.put("/{stock_name}/portfolio", response_model=schemas.PositionOut)
+def associar_ativo_a_carteira(
+    stock_name: str,
+    assignment: schemas.PortfolioAssignment,
+    current_user: CurrentUser,
+    investment_service: IInvestmentService = Depends(get_investment_service),
+):
+    """UC03 - Associa (ou move) o ativo para uma carteira do usuário."""
+    return investment_service.associate_position(
+        current_user.user_id, stock_name, assignment.portfolio_id
+    )
 
 
 @router.get("/validar/{stock_name}", response_model=schemas.StockValidationOut)

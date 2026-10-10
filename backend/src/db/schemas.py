@@ -2,7 +2,14 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    EmailStr,
+    Field,
+    field_validator,
+    model_validator,
+)
 
 
 class UserCreate(BaseModel):
@@ -62,6 +69,11 @@ class StockTradeCreate(BaseModel):
     trade_side: Literal["BUY", "SELL"]
     trade_date: datetime | None = None
     auto_cotacao: bool = False
+    portfolio_id: int | None = Field(
+        default=None,
+        gt=0,
+        description="Carteira (Portfolio Component) à qual o ativo será associado.",
+    )
 
     @field_validator("stock_name")
     @classmethod
@@ -101,6 +113,55 @@ class PositionOut(BaseModel):
     company_name: str
     stock_quantity: int
     preco_medio: Decimal
+    portfolio_id: int | None = None
+    portfolio_name: str | None = None
+
+
+class PortfolioCreate(BaseModel):
+    portfolio_name: str = Field(min_length=1, max_length=100)
+    description: str | None = Field(default=None, max_length=255)
+
+    @field_validator("portfolio_name")
+    @classmethod
+    def normalize_name(cls, value: str) -> str:
+        name = value.strip()
+        if not name:
+            raise ValueError("O nome da carteira não pode ser vazio.")
+        return name
+
+
+class PortfolioUpdate(BaseModel):
+    portfolio_name: str | None = Field(default=None, min_length=1, max_length=100)
+    description: str | None = Field(default=None, max_length=255)
+
+    @field_validator("portfolio_name")
+    @classmethod
+    def normalize_name(cls, value: str | None) -> str | None:
+        if value is None:
+            raise ValueError("O nome da carteira não pode ser nulo.")
+        name = value.strip()
+        if not name:
+            raise ValueError("O nome da carteira não pode ser vazio.")
+        return name
+
+    @model_validator(mode="after")
+    def require_changes(self) -> "PortfolioUpdate":
+        if not self.model_fields_set:
+            raise ValueError("Informe ao menos um campo para alterar.")
+        return self
+
+
+class PortfolioOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    portfolio_id: int
+    portfolio_name: str
+    description: str | None = None
+    created_at: datetime
+
+
+class PortfolioAssignment(BaseModel):
+    portfolio_id: int = Field(gt=0)
 
 
 class StockValidationOut(BaseModel):

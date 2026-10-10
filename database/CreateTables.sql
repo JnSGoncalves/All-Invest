@@ -52,6 +52,27 @@ CREATE TABLE users_brokers (
     PRIMARY KEY (broker_id, user_id)
 );
 
+CREATE TABLE portfolios (
+    portfolio_id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+    portfolio_name VARCHAR(100) NOT NULL,
+    description VARCHAR(255),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT uq_portfolios_user_name UNIQUE (user_id, portfolio_name),
+    CONSTRAINT uq_portfolios_id_user UNIQUE (portfolio_id, user_id)
+);
+
+CREATE TABLE portfolios_stocks (
+    user_id INTEGER NOT NULL,
+    stock_id INTEGER NOT NULL REFERENCES stocks(stock_id),
+    portfolio_id INTEGER NOT NULL,
+    PRIMARY KEY (user_id, stock_id),
+    CONSTRAINT fk_portfolios_stocks_portfolio
+        FOREIGN KEY (portfolio_id, user_id)
+        REFERENCES portfolios(portfolio_id, user_id)
+        ON DELETE CASCADE
+);
+
 CREATE INDEX ix_users_user_id ON users(user_id);
 CREATE INDEX ix_users_email ON users(email);
 CREATE INDEX ix_refresh_tokens_user_id ON refresh_tokens(user_id);
@@ -61,3 +82,6 @@ CREATE INDEX ix_brokers_broker_id ON brokers(broker_id);
 CREATE INDEX ix_users_stocks_user_id ON users_stocks(user_id);
 CREATE INDEX ix_users_stocks_stock_id ON users_stocks(stock_id);
 CREATE INDEX ix_users_brokers_user_id ON users_brokers(user_id);
+CREATE INDEX ix_portfolios_portfolio_id ON portfolios(portfolio_id);
+CREATE INDEX ix_portfolios_user_id ON portfolios(user_id);
+CREATE INDEX ix_portfolios_stocks_portfolio_id ON portfolios_stocks(portfolio_id);

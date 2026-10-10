@@ -1,15 +1,16 @@
 import os
+from pathlib import Path
 from sqlalchemy import create_engine
 from sqlalchemy.engine import make_url
 from sqlalchemy.orm import sessionmaker, declarative_base
 from dotenv import load_dotenv
 
-load_dotenv()
+load_dotenv(Path(__file__).resolve().parents[2] / ".env")
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 if not DATABASE_URL:
     raise RuntimeError(
-        "DATABASE_URL não configurada. Use a connection string PostgreSQL do Supabase no arquivo .env."
+        "DATABASE_URL não configurada. Copie backend/.env.example para backend/.env e preencha uma connection string PostgreSQL válida."
     )
 
 # A conexão direta do Supabase usa IPv6. Em redes locais IPv4, esta opção

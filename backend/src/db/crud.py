@@ -2,7 +2,7 @@ import secrets
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -210,6 +210,24 @@ def get_user_stock_trades(db: Session, user_id: int) -> list[models.UserStock]:
     return list(db.scalars(statement))
 
 
+def delete_user_stock_trades(db: Session, *, user_id: int, stock_name: str) -> int:
+    """Remove apenas as operações do ativo pertencentes ao usuário."""
+    statement = (
+        select(models.UserStock)
+        .join(models.Stock, models.Stock.stock_id == models.UserStock.stock_id)
+        .where(
+            models.UserStock.user_id == user_id,
+            models.Stock.stock_name == stock_name,
+        )
+    )
+    trades = list(db.scalars(statement))
+    for trade in trades:
+        db.delete(trade)
+    if trades:
+        db.commit()
+    return len(trades)
+
+
 def create_user_stock(
     db: Session,
     *,
@@ -241,3 +259,122 @@ def create_user_stock(
     db.commit()
     db.refresh(user_stock)
     return user_stock
+
+
+# ===========================================================================
+# Portfolios (Portfolio Component)
+# ---------------------------------------------------------------------------
+# Carteiras do usuário e a associação ativo -> carteira (`portfolios_stocks`).
+# As regras de negócio ficam em services/portfolio_service.py.
+# ===========================================================================
+
+
+def create_portfolio(
+    db: Session, *, user_id: int, portfolio_name: str, description: str | None
+) -> models.Portfolio:
+    portfolio = models.Portfolio(
+        user_id=user_id,
+        portfolio_name=portfolio_name,
+        description=description,
+    )
+    db.add(portfolio)
+    db.commit()
+    db.refresh(portfolio)
+    return portfolio
+
+
+def get_portfolio(
+    db: Session, *, user_id: int, portfolio_id: int
+) -> models.Portfolio | None:
+    """Busca a carteira somente se ela pertencer ao usuário informado."""
+    return (
+        db.query(models.Portfolio)
+        .filter(
+            models.Portfolio.portfolio_id == portfolio_id,
+            models.Portfolio.user_id == user_id,
+        )
+        .first()
+    )
+
+
+def get_portfolio_by_name(
+    db: Session, *, user_id: int, portfolio_name: str
+) -> models.Portfolio | None:
+    return (
+        db.query(models.Portfolio)
+        .filter(
+            models.Portfolio.user_id == user_id,
+            func.lower(models.Portfolio.portfolio_name) == portfolio_name.lower(),
+        )
+        .first()
+    )
+
+
+def list_portfolios(db: Session, user_id: int) -> list[models.Portfolio]:
+    statement = (
+        select(models.Portfolio)
+        .where(models.Portfolio.user_id == user_id)
+        .order_by(models.Portfolio.portfolio_name)
+    )
+    return list(db.scalars(statement))
+
+
+def update_portfolio(
+    db: Session, portfolio: models.Portfolio, changes: dict
+) -> models.Portfolio:
+    for field, value in changes.items():
+        setattr(portfolio, field, value)
+    db.commit()
+    db.refresh(portfolio)
+    return portfolio
+
+
+def delete_portfolio(db: Session, portfolio: models.Portfolio) -> None:
+    """Remove a carteira e as associações; as operações em users_stocks são mantidas."""
+    db.execute(
+        delete(models.PortfolioStock).where(
+            models.PortfolioStock.portfolio_id == portfolio.portfolio_id
+        )
+    )
+    db.delete(portfolio)
+    db.commit()
+
+
+def set_stock_portfolio(
+    db: Session, *, user_id: int, stock_id: int, portfolio_id: int
+) -> models.PortfolioStock:
+    """Associa o ativo à carteira ou move-o, se já estiver em outra."""
+    association = db.get(models.PortfolioStock, (user_id, stock_id))
+    if association is None:
+        association = models.PortfolioStock(
+            user_id=user_id, stock_id=stock_id, portfolio_id=portfolio_id
+        )
+        db.add(association)
+    else:
+        association.portfolio_id = portfolio_id
+    db.commit()
+    return association
+
+
+def delete_stock_portfolio(db: Session, *, user_id: int, stock_id: int) -> bool:
+    result = db.execute(
+        delete(models.PortfolioStock).where(
+            models.PortfolioStock.user_id == user_id,
+            models.PortfolioStock.stock_id == stock_id,
+        )
+    )
+    db.commit()
+    return bool(result.rowcount)
+
+
+def get_stock_portfolios(db: Session, user_id: int) -> dict[int, models.Portfolio]:
+    """Mapa stock_id -> carteira para os ativos associados do usuário."""
+    statement = (
+        select(models.PortfolioStock.stock_id, models.Portfolio)
+        .join(
+            models.Portfolio,
+            models.Portfolio.portfolio_id == models.PortfolioStock.portfolio_id,
+        )
+        .where(models.PortfolioStock.user_id == user_id)
+    )
+    return {stock_id: portfolio for stock_id, portfolio in db.execute(statement)}

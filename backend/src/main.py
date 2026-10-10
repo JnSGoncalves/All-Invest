@@ -1,16 +1,22 @@
+import os
+from pathlib import Path
+
+from dotenv import load_dotenv
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.openapi.utils import get_openapi
 from fastapi.middleware.cors import CORSMiddleware
+
+# Carrega a configuração antes de importar módulos que constroem o engine SQLAlchemy.
+load_dotenv(Path(__file__).resolve().parents[1] / ".env")
+
 from .db.crud import validate_api_key
 from .db.database import SessionLocal
 from .routers import users
 from .routers import auth
 from .routers import stocks
-import os
-from dotenv import load_dotenv
+from .routers import portfolios
 from starlette.middleware.sessions import SessionMiddleware
-load_dotenv()
 
 app = FastAPI(
     title="All Invest API",
@@ -111,6 +117,7 @@ app.add_middleware(
 app.include_router(users.router)
 app.include_router(auth.router)
 app.include_router(stocks.router)
+app.include_router(portfolios.router)
 
 
 @app.get("/health", tags=["health"])
