@@ -1,8 +1,11 @@
-import type { AuthResponse, TokenSession, User } from "../types/auth";
+import type { AuthResponse, TokenSession } from "../types/auth";
+
+export const SESSION_CLEARED_EVENT = "allinvest:session-cleared";
+export const SESSION_UPDATED_EVENT = "allinvest:session-updated";
 
 const ACCESS_TOKEN_KEY = "allinvest.access_token";
 const ACCESS_EXPIRES_AT_KEY = "allinvest.access_expires_at";
-const REFRESH_TOKEN_KEY = "allinvest.refresh_token";
+export const REFRESH_TOKEN_KEY = "allinvest.refresh_token";
 const USER_KEY = "allinvest.user";
 
 export function saveAuthResponse(response: AuthResponse): void {
@@ -11,7 +14,7 @@ export function saveAuthResponse(response: AuthResponse): void {
     refreshToken: response.refresh_token,
     expiresAt: Date.now() + response.expires_in * 1000,
   });
-  saveUser(response.user);
+  window.dispatchEvent(new CustomEvent(SESSION_UPDATED_EVENT, { detail: response.user }));
 }
 
 export function saveTokenSession(session: TokenSession): void {
@@ -21,6 +24,8 @@ export function saveTokenSession(session: TokenSession): void {
 }
 
 export function getAccessToken(): string | null {
+  const expiresAt = Number(sessionStorage.getItem(ACCESS_EXPIRES_AT_KEY));
+  if (!Number.isFinite(expiresAt) || expiresAt <= Date.now() + 15_000) return null;
   return sessionStorage.getItem(ACCESS_TOKEN_KEY);
 }
 
@@ -28,25 +33,10 @@ export function getRefreshToken(): string | null {
   return localStorage.getItem(REFRESH_TOKEN_KEY);
 }
 
-export function getCachedUser(): User | null {
-  const rawUser = localStorage.getItem(USER_KEY);
-  if (!rawUser) return null;
-
-  try {
-    return JSON.parse(rawUser) as User;
-  } catch {
-    localStorage.removeItem(USER_KEY);
-    return null;
-  }
-}
-
-export function saveUser(user: User): void {
-  localStorage.setItem(USER_KEY, JSON.stringify(user));
-}
-
 export function clearAuthSession(): void {
   sessionStorage.removeItem(ACCESS_TOKEN_KEY);
   sessionStorage.removeItem(ACCESS_EXPIRES_AT_KEY);
   localStorage.removeItem(REFRESH_TOKEN_KEY);
   localStorage.removeItem(USER_KEY);
+  window.dispatchEvent(new Event(SESSION_CLEARED_EVENT));
 }

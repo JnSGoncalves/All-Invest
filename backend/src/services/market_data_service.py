@@ -1,5 +1,5 @@
 """
-services/ticker_services.py
+services/market_data_service.py
 
 Integração com a brapi.dev para:
   - validar se um ticker existe e está ativo na B3 antes do cadastro
@@ -19,22 +19,25 @@ from fastapi import HTTPException, status
 
 BRAPI_URL = os.getenv("BRAPI_URL", "https://brapi.dev/api/v2")
 BRAPI_TOKEN = os.getenv("BRAPI_TOKEN")
-
-if not BRAPI_TOKEN:
-    raise RuntimeError(
-        "BRAPI_TOKEN não configurado. Defina a variável no arquivo .env."
-    )
-
-_HEADERS = {"Authorization": f"Bearer {BRAPI_TOKEN}"}
 _TIMEOUT = httpx.Timeout(10.0, connect=5.0)
 
 
 async def _get(path: str, params: dict) -> dict:
     """Wrapper de requisição GET com tratamento de erros de rede/HTTP."""
+    if not BRAPI_TOKEN:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="BRAPI_TOKEN não configurado no servidor.",
+        )
+
     url = f"{BRAPI_URL}{path}"
     try:
         async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
-            response = await client.get(url, headers=_HEADERS, params=params)
+            response = await client.get(
+                url,
+                headers={"Authorization": f"Bearer {BRAPI_TOKEN}"},
+                params=params,
+            )
     except httpx.TimeoutException:
         raise HTTPException(
             status_code=status.HTTP_504_GATEWAY_TIMEOUT,
@@ -193,3 +196,27 @@ async def autocomplete_tickers(query: str, limit: int = 8) -> list[dict]:
         for item in data.get("results", [])
         if item.get("isActive", True)
     ]
+
+
+class BrapiMarketDataService:
+    """Implementação brapi.dev do contrato do componente Market Data."""
+
+    async def validate_ticker(self, stock_name: str) -> dict:
+        return await validar_ticker(stock_name)
+
+    async def get_quote(self, stock_name: str) -> Decimal:
+        return await obter_cotacao(stock_name)
+
+    async def list_tickers(
+        self,
+        search: Optional[str] = None,
+        tipo: Optional[str] = None,
+        page: int = 1,
+        limit: int = 20,
+    ) -> dict:
+        return await listar_tickers(search=search, tipo=tipo, page=page, limit=limit)
+
+    async def autocomplete_tickers(
+        self, query: str, limit: int = 8
+    ) -> list[dict]:
+        return await autocomplete_tickers(query, limit=limit)
