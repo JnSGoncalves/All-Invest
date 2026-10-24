@@ -34,7 +34,7 @@ Frontend: `http://localhost:4671`. API: `http://localhost:4670/docs`.
 
 ## Produção
 
-1. Copie `.env.production.example` para `.env.production` e preencha a API key.
+1. Configure `API_KEY` em `frontend/.env` com o valor cadastrado em `api_keys.api_key`. O Compose passa esse arquivo ao container Nginx.
 2. Copie `backend/.env.production.example` para `backend/.env` no servidor e
    preencha as credenciais privadas: banco, Google client secret, `SECRET_KEY`
    e `SESSION_SECRET_KEY`.
@@ -46,7 +46,7 @@ Frontend: `http://localhost:4671`. API: `http://localhost:4670/docs`.
 docker compose --env-file .env.production up -d --build
 ```
 
-5. Encaminhe os domínios no proxy reverso:
+5. Encaminhe os domínios no proxy reverso. A interface chama `/api/*` no mesmo host e o Nginx do container frontend encaminha essas chamadas ao backend, adicionando `API_KEY` apenas no servidor:
 
 ```nginx
 server {
@@ -70,5 +70,5 @@ server {
 }
 ```
 
-Ative HTTPS para ambos os hosts antes de testar o OAuth. O frontend é compilado
-com `VITE_API_URL`, então qualquer mudança de URL exige novo `docker compose build`.
+Ative HTTPS para ambos os hosts antes de testar o OAuth. `API_KEY` é lida de
+`frontend/.env` em tempo de execução; ela não é incorporada ao build.

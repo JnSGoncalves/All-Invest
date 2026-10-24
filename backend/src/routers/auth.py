@@ -4,13 +4,20 @@ from urllib.parse import urlencode, urlsplit
 from authlib.integrations.base_client.errors import OAuthError
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import RedirectResponse
-from sqlalchemy.orm import Session
+
 from ..dependencies.auth import CurrentUser
-from ..services import security, tokens
-from ..db import crud
+from ..dependencies.components import (
+    get_auth_service,
+    get_google_oauth_service,
+    get_user_service,
+)
 from ..db import schemas
-from ..db.database import get_db
-from ..services.google.auth import google_is_configured, oauth
+from ..interfaces import IAuthService, IGoogleOAuthService, IUserService
+from ..services.auth_service import (
+    AccountNotFoundError,
+    IncorrectPasswordError,
+    InvalidRefreshSessionError,
+)
 
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 logger = logging.getLogger(__name__)
@@ -38,7 +45,10 @@ def _oauth_error_detail(exc: OAuthError) -> str:
 
 
 @router.post("/login", response_model=schemas.AuthResponse)
-def login(credentials: schemas.UserLogin, db: Session = Depends(get_db)):
+def login(
+    credentials: schemas.UserLogin,
+    auth_service: IAuthService = Depends(get_auth_service),
+):
     """
     HU02 - Login do usuário.
 
@@ -46,32 +56,29 @@ def login(credentials: schemas.UserLogin, db: Session = Depends(get_db)):
     CA02 (Conta inexistente): e-mail não cadastrado -> avisa e sugere o cadastro.
     Senha incorreta (conta existe): 401, sem revelar detalhes além do necessário.
     """
-    user = crud.get_user_by_email(db, credentials.email)
-
-    if not user:
+    try:
+        return auth_service.authenticate(credentials.email, credentials.password)
+    except AccountNotFoundError as exc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Não encontramos uma conta com este e-mail. Que tal se cadastrar?",
-        )
-
-    if not security.verify_password(credentials.password, user.password_hash):
+        ) from exc
+    except IncorrectPasswordError as exc:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="E-mail ou senha incorretos.",
-        )
-
-    return tokens.issue_token_pair(db, user)
+        ) from exc
 
 
 @router.post("/refresh", response_model=schemas.AuthResponse)
 def refresh_session(
     payload: schemas.RefreshTokenRequest,
-    db: Session = Depends(get_db),
+    auth_service: IAuthService = Depends(get_auth_service),
 ):
     """Rotaciona o refresh token e devolve um novo par de tokens."""
     try:
-        return tokens.rotate_refresh_token(db, payload.refresh_token)
-    except tokens.InvalidRefreshTokenError as exc:
+        return auth_service.refresh_session(payload.refresh_token)
+    except InvalidRefreshSessionError as exc:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Refresh token inválido, expirado ou revogado.",
@@ -82,21 +89,20 @@ def refresh_session(
 def logout(
     payload: schemas.LogoutRequest,
     current_user: CurrentUser,
-    db: Session = Depends(get_db),
+    auth_service: IAuthService = Depends(get_auth_service),
 ):
     """Revoga o refresh token da sessão atual."""
-    crud.revoke_refresh_token(
-        db,
-        token_hash=security.hash_refresh_token(payload.refresh_token),
-        user_id=current_user.user_id,
-    )
+    auth_service.logout(payload.refresh_token, current_user.user_id)
     return schemas.MessageResponse(message="Logout realizado com sucesso.")
 
 
 @router.post("/logout-all", response_model=schemas.MessageResponse)
-def logout_all(current_user: CurrentUser, db: Session = Depends(get_db)):
+def logout_all(
+    current_user: CurrentUser,
+    auth_service: IAuthService = Depends(get_auth_service),
+):
     """Revoga todas as sessões renováveis do usuário autenticado."""
-    crud.revoke_all_refresh_tokens(db, current_user.user_id)
+    auth_service.logout_all(current_user.user_id)
     return schemas.MessageResponse(message="Todas as sessões foram encerradas.")
 
 
@@ -120,9 +126,12 @@ a requisição AJAX e navegadores não permitem que ela siga o redirecionamento
 para o domínio de autenticação do Google.
 """,
 )
-async def google_login(request: Request):
+async def google_login(
+    request: Request,
+    google_oauth: IGoogleOAuthService = Depends(get_google_oauth_service),
+):
     """Inicia o fluxo OAuth 2.0/OpenID Connect no Google."""
-    if not google_is_configured():
+    if not google_oauth.is_configured():
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Login com Google não está configurado no servidor.",
@@ -148,7 +157,7 @@ async def google_login(request: Request):
         )
         return RedirectResponse(canonical_login_url)
 
-    return await oauth.google.authorize_redirect(request, redirect_uri)
+    return await google_oauth.authorize_redirect(request, redirect_uri)
 
 
 @router.get(
@@ -156,16 +165,21 @@ async def google_login(request: Request):
     response_model=schemas.AuthResponse,
     name="google_callback",
 )
-async def google_callback(request: Request, db: Session = Depends(get_db)):
+async def google_callback(
+    request: Request,
+    db_users: IUserService = Depends(get_user_service),
+    auth_service: IAuthService = Depends(get_auth_service),
+    google_oauth: IGoogleOAuthService = Depends(get_google_oauth_service),
+):
     """Valida o retorno do Google e emite o JWT usado pelo restante da API."""
-    if not google_is_configured():
+    if not google_oauth.is_configured():
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Login com Google não está configurado no servidor.",
         )
 
     try:
-        google_token = await oauth.google.authorize_access_token(request)
+        google_token = await google_oauth.authorize_access_token(request)
     except OAuthError as exc:
         logger.warning(
             "Falha no callback OAuth do Google: error=%s description=%s "
@@ -183,7 +197,7 @@ async def google_callback(request: Request, db: Session = Depends(get_db)):
     user_info = google_token.get("userinfo")
     if not user_info:
         try:
-            user_info = await oauth.google.userinfo(token=google_token)
+            user_info = await google_oauth.get_userinfo(google_token)
         except OAuthError as exc:
             logger.warning(
                 "Falha ao obter perfil Google: error=%s description=%s",
@@ -202,12 +216,12 @@ async def google_callback(request: Request, db: Session = Depends(get_db)):
             detail="A conta do Google precisa ter um e-mail verificado.",
         )
 
-    user = crud.get_user_by_email(db, email)
+    user = db_users.get_by_email(email)
     if not user:
         name = user_info.get("name") or email.split("@", maxsplit=1)[0]
-        user = crud.create_google_user(db, name=name, email=email)
+        user = db_users.create_from_google(name=name, email=email)
 
-    auth_response = tokens.issue_token_pair(db, user)
+    auth_response = auth_service.issue_session(user)
     frontend_callback = os.getenv("FRONTEND_AUTH_CALLBACK_URL")
     if frontend_callback:
         query = urlencode(

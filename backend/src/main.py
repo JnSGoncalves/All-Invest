@@ -1,15 +1,22 @@
+import os
+from pathlib import Path
+
+from dotenv import load_dotenv
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.openapi.utils import get_openapi
 from fastapi.middleware.cors import CORSMiddleware
+
+# Carrega a configuração antes de importar módulos que constroem o engine SQLAlchemy.
+load_dotenv(Path(__file__).resolve().parents[1] / ".env")
+
 from .db.crud import validate_api_key
 from .db.database import SessionLocal
 from .routers import users
 from .routers import auth
-import os
-from dotenv import load_dotenv
+from .routers import stocks
+from .routers import portfolios
 from starlette.middleware.sessions import SessionMiddleware
-load_dotenv()
 
 app = FastAPI(
     title="All Invest API",
@@ -37,18 +44,19 @@ async def verify_api_key(request: Request, call_next):
         "/redoc",
         "/health",
     }
-    public_prefixes = ("/api/v1/auth",)
     request_path = request.url.path.rstrip("/") or "/"
+    oauth_routes_without_api_key = {
+        "/api/v1/auth/google",
+        "/api/v1/auth/google/callback",
+    }
 
-    # O preflight CORS não envia X-API-Key. Todas as rotas de autenticação
-    # também precisam ser públicas para que o usuário consiga entrar.
+    # O preflight CORS não envia X-API-Key. O início e o callback OAuth do
+    # Google são exceções porque o navegador/provedor não enviam esse header
+    # durante os redirecionamentos; os demais endpoints de auth exigem a chave.
     if (
         request.method == "OPTIONS"
         or request_path in public_routes
-        or any(
-            request_path == prefix or request_path.startswith(f"{prefix}/")
-            for prefix in public_prefixes
-        )
+        or request_path in oauth_routes_without_api_key
     ):
         return await call_next(request)
 
@@ -108,6 +116,8 @@ app.add_middleware(
 
 app.include_router(users.router)
 app.include_router(auth.router)
+app.include_router(stocks.router)
+app.include_router(portfolios.router)
 
 
 @app.get("/health", tags=["health"])
@@ -139,9 +149,7 @@ def custom_openapi():
         {"ApiKeyAuth": []}
     ]
 
-    public_auth_paths = {
-        "/api/v1/auth/login",
-        "/api/v1/auth/refresh",
+    oauth_paths = {
         "/api/v1/auth/google",
         "/api/v1/auth/google/callback",
     }
@@ -150,8 +158,16 @@ def custom_openapi():
         for operation in path_item.values():
             if not isinstance(operation, dict) or "responses" not in operation:
                 continue
-            if public_path == "/health" or public_path in public_auth_paths:
+            if public_path == "/health" or public_path in oauth_paths:
                 operation["security"] = []
+            elif public_path.startswith("/api/v1/auth"):
+                requirements = operation.get("security", [])
+                if any("BearerAuth" in requirement for requirement in requirements):
+                    operation["security"] = [
+                        {"ApiKeyAuth": [], "BearerAuth": []}
+                    ]
+                else:
+                    operation["security"] = [{"ApiKeyAuth": []}]
             elif not public_path.startswith("/api/v1/auth"):
                 requirements = operation.get("security", [])
                 if any("BearerAuth" in requirement for requirement in requirements):

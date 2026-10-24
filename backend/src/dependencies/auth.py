@@ -2,12 +2,11 @@ from typing import Annotated
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from sqlalchemy.orm import Session
 
 from .. import models
-from ..db import crud
-from ..db.database import get_db
+from ..interfaces import IUserService
 from ..services import security
+from .components import get_user_service
 
 bearer_scheme = HTTPBearer(
     scheme_name="BearerAuth",
@@ -26,7 +25,7 @@ def _unauthorized(detail: str = "Autenticação necessária.") -> HTTPException:
 
 def get_current_user(
     credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(bearer_scheme)],
-    db: Annotated[Session, Depends(get_db)],
+    users: Annotated[IUserService, Depends(get_user_service)],
 ) -> models.User:
     """Dependência genérica para qualquer endpoint que exija usuário logado."""
     if not credentials or credentials.scheme.lower() != "bearer":
@@ -39,7 +38,7 @@ def get_current_user(
     except security.InvalidAccessTokenError as exc:
         raise _unauthorized("Access token inválido.") from exc
 
-    user = crud.get_user_by_id(db, user_id)
+    user = users.get_by_id(user_id)
     if not user:
         raise _unauthorized("Usuário do token não existe.")
     return user

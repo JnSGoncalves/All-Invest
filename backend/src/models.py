@@ -4,10 +4,12 @@ from sqlalchemy import (
     Column,
     DateTime,
     ForeignKey,
+    ForeignKeyConstraint,
     Integer,
     Numeric,
     String,
     Text,
+    UniqueConstraint,
     func,
 )
 from sqlalchemy.orm import relationship
@@ -117,3 +119,54 @@ class UserBroker(Base):
 
     user = relationship("User", back_populates="brokers")
     broker = relationship("Broker")
+
+
+# ---------------------------------------------------------------------------
+# Portfolio Component (Lab 4): carteiras do usuário e associação de ativos.
+# Ver database/migrations/002_create_portfolios.sql.
+# ---------------------------------------------------------------------------
+
+class Portfolio(Base):
+    """Carteira criada pelo usuário para organizar seus investimentos."""
+
+    __tablename__ = "portfolios"
+
+    portfolio_id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(
+        Integer,
+        ForeignKey("users.user_id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    portfolio_name = Column(String(100), nullable=False)
+    description = Column(String(255), nullable=True)
+    created_at = Column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+    )
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "portfolio_name", name="uq_portfolios_user_name"),
+        UniqueConstraint("portfolio_id", "user_id", name="uq_portfolios_id_user"),
+    )
+
+
+class PortfolioStock(Base):
+    """Associação ativo -> carteira; cada ativo do usuário fica em no máximo uma carteira."""
+
+    __tablename__ = "portfolios_stocks"
+
+    user_id = Column(Integer, primary_key=True)
+    stock_id = Column(Integer, ForeignKey("stocks.stock_id"), primary_key=True)
+    portfolio_id = Column(Integer, nullable=False, index=True)
+
+    # A FK composta garante que a carteira pertence ao mesmo usuário do ativo.
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["portfolio_id", "user_id"],
+            ["portfolios.portfolio_id", "portfolios.user_id"],
+            ondelete="CASCADE",
+            name="fk_portfolios_stocks_portfolio",
+        ),
+    )

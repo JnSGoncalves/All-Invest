@@ -20,5 +20,5 @@ export interface TokenSession {
 }
 
 export interface ApiErrorBody {
-  detail?: string;
+  detail?: string | Array<{ msg?: string }>;
 }

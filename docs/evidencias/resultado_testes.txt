@@ -1,0 +1,75 @@
+# Execução: 2026-10-03 16:55:46 — comando: python -m pytest -v (pasta backend/)
+============================= test session starts =============================
+platform win32 -- Python 3.12.0, pytest-9.1.1, pluggy-1.6.0 -- C:\Users\WallaceIzidoro\Downloads\All-Invest-feature-validacao\All-Invest-feature-validacao\backend\.venv\Scripts\python.exe
+rootdir: C:\Users\WallaceIzidoro\Downloads\All-Invest-feature-validacao\All-Invest-feature-validacao\backend
+configfile: pytest.ini
+testpaths: tests
+plugins: anyio-4.15.1
+collecting ... collected 45 items
+
+tests/test_api_integration.py::test_fluxo_completo_carteira_e_investimento PASSED [  2%]
+tests/test_api_integration.py::test_registrar_operacao_em_carteira_inexistente_retorna_404 PASSED [  4%]
+tests/test_api_integration.py::test_criar_carteira_com_nome_repetido_retorna_409 PASSED [  6%]
+tests/test_api_integration.py::test_editar_carteira_sem_campos_retorna_422 PASSED [  8%]
+tests/test_api_integration.py::test_rotas_de_carteira_exigem_api_key PASSED [ 11%]
+tests/test_integration_investment_portfolio.py::test_registrar_operacao_com_carteira_associa_ativo_no_portfolio PASSED [ 13%]
+tests/test_integration_investment_portfolio.py::test_associar_posicao_existente_e_mover_entre_carteiras PASSED [ 15%]
+tests/test_integration_investment_portfolio.py::test_consultar_posicoes_por_carteira PASSED [ 17%]
+tests/test_integration_investment_portfolio.py::test_remover_carteira_preserva_operacoes_e_desassocia_posicoes PASSED [ 20%]
+tests/test_integration_investment_portfolio.py::test_remover_investimento_remove_associacao_no_portfolio PASSED [ 22%]
+tests/test_integration_investment_portfolio.py::test_nao_associa_ativo_a_carteira_de_outro_usuario PASSED [ 24%]
+tests/test_integration_investment_portfolio.py::test_filtrar_por_carteira_inexistente_retorna_404 PASSED [ 26%]
+tests/test_interface_contracts.py::test_implementacao_fornece_todas_as_operacoes_da_interface[Portfolio] PASSED [ 28%]
+tests/test_interface_contracts.py::test_implementacao_fornece_todas_as_operacoes_da_interface[Investment] PASSED [ 31%]
+tests/test_interface_contracts.py::test_interfaces_expoem_as_operacoes_do_lab3 PASSED [ 33%]
+tests/test_interface_contracts.py::test_investment_requer_portfolio_pelo_construtor PASSED [ 35%]
+tests/test_investment_component.py::test_create_trade_valida_ticker_e_persiste_compra PASSED [ 37%]
+tests/test_investment_component.py::test_create_trade_com_auto_cotacao_usa_preco_do_market_data PASSED [ 40%]
+tests/test_investment_component.py::test_create_trade_ticker_inexistente_retorna_404 PASSED [ 42%]
+tests/test_investment_component.py::test_create_trade_corretora_inexistente_retorna_400 PASSED [ 44%]
+tests/test_investment_component.py::test_create_trade_venda_acima_do_saldo_retorna_422 PASSED [ 46%]
+tests/test_investment_component.py::test_create_trade_com_carteira_valida_e_associa PASSED [ 48%]
+tests/test_investment_component.py::test_create_trade_com_carteira_inexistente_nao_grava_operacao PASSED [ 51%]
+tests/test_investment_component.py::test_get_positions_calcula_quantidade_e_preco_medio PASSED [ 53%]
+tests/test_investment_component.py::test_get_positions_oculta_ativo_zerado PASSED [ 55%]
+tests/test_investment_component.py::test_get_positions_isola_usuarios PASSED [ 57%]
+tests/test_investment_component.py::test_get_positions_filtra_por_carteira PASSED [ 60%]
+tests/test_investment_component.py::test_associate_position_retorna_posicao_com_carteira PASSED [ 62%]
+tests/test_investment_component.py::test_associate_position_sem_posicao_retorna_404 PASSED [ 64%]
+tests/test_investment_component.py::test_remove_position_apaga_operacoes_e_desassocia PASSED [ 66%]
+tests/test_investment_component.py::test_remove_position_inexistente_retorna_404 PASSED [ 68%]
+tests/test_portfolio_component.py::test_create_portfolio_persiste_carteira_do_usuario PASSED [ 71%]
+tests/test_portfolio_component.py::test_create_portfolio_rejeita_nome_repetido_sem_diferenciar_maiusculas PASSED [ 73%]
+tests/test_portfolio_component.py::test_create_portfolio_permite_mesmo_nome_para_usuarios_diferentes PASSED [ 75%]
+tests/test_portfolio_component.py::test_portfolio_create_rejeita_nome_vazio PASSED [ 77%]
+tests/test_portfolio_component.py::test_list_portfolios_retorna_somente_as_do_usuario_ordenadas PASSED [ 80%]
+tests/test_portfolio_component.py::test_get_portfolio_de_outro_usuario_retorna_404 PASSED [ 82%]
+tests/test_portfolio_component.py::test_update_portfolio_altera_somente_campos_enviados PASSED [ 84%]
+tests/test_portfolio_component.py::test_update_portfolio_rejeita_nome_de_outra_carteira PASSED [ 86%]
+tests/test_portfolio_component.py::test_portfolio_update_exige_ao_menos_um_campo PASSED [ 88%]
+tests/test_portfolio_component.py::test_delete_portfolio_remove_carteira_e_associacoes PASSED [ 91%]
+tests/test_portfolio_component.py::test_delete_portfolio_de_outro_usuario_retorna_404 PASSED [ 93%]
+tests/test_portfolio_component.py::test_associate_investment_associa_e_move_entre_carteiras PASSED [ 95%]
+tests/test_portfolio_component.py::test_associate_investment_em_carteira_de_outro_usuario_retorna_404 PASSED [ 97%]
+tests/test_portfolio_component.py::test_dissociate_investment_informa_se_havia_associacao PASSED [100%]
+
+============================== warnings summary ===============================
+.venv\Lib\site-packages\fastapi\testclient.py:1
+  C:\Users\WallaceIzidoro\Downloads\All-Invest-feature-validacao\All-Invest-feature-validacao\backend\.venv\Lib\site-packages\fastapi\testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+.venv\Lib\site-packages\starlette\testclient.py:53
+  C:\Users\WallaceIzidoro\Downloads\All-Invest-feature-validacao\All-Invest-feature-validacao\backend\.venv\Lib\site-packages\starlette\testclient.py:53: DeprecationWarning: The anyio.abc.BlockingPortal alias is deprecated, use anyio.from_thread.BlockingPortal instead.
+    _PortalFactoryType = Callable[[], AbstractContextManager[anyio.abc.BlockingPortal]]
+
+.venv\Lib\site-packages\authlib\integrations\httpx_client\assertion_client.py:5
+  C:\Users\WallaceIzidoro\Downloads\All-Invest-feature-validacao\All-Invest-feature-validacao\backend\.venv\Lib\site-packages\authlib\integrations\httpx_client\assertion_client.py:5: AuthlibDeprecationWarning: The httpx module is deprecated; please use httpx2 instead.
+    from ._compat import httpx2
+
+tests/test_investment_component.py::test_create_trade_venda_acima_do_saldo_retorna_422
+  C:\Users\WallaceIzidoro\Downloads\All-Invest-feature-validacao\All-Invest-feature-validacao\backend\tests\test_investment_component.py:121: StarletteDeprecationWarning: 'HTTP_422_UNPROCESSABLE_ENTITY' is deprecated. Use 'HTTP_422_UNPROCESSABLE_CONTENT' instead.
+    await service.create_trade(user.user_id, trade(qty=6, side="SELL", minutes=1))
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+- generated xml file: C:\Users\WallaceIzidoro\Downloads\All-Invest-feature-validacao\All-Invest-feature-validacao\docs\evidencias\resultado_testes.xml -
+======================= 45 passed, 4 warnings in 1.96s ========================

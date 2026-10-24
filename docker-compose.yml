@@ -19,9 +19,8 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-      args:
-        VITE_API_URL: ${VITE_API_URL:-http://localhost:4670}
-        VITE_API_KEY: ${VITE_API_KEY}
+    env_file:
+      - ./frontend/.env
     ports:
       - "127.0.0.1:4671:80"
     restart: unless-stopped

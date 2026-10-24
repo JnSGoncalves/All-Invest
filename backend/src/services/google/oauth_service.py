@@ -28,3 +28,19 @@ def google_is_configured() -> bool:
         (os.getenv("GOOGLE_CLIENT_ID") or os.getenv("CLIENT_ID"))
         and (os.getenv("GOOGLE_CLIENT_SECRET") or os.getenv("CLIENT_SECRET"))
     )
+
+
+class GoogleOAuthService:
+    """Implementação Authlib do contrato OAuth consumido pelo componente Auth."""
+
+    def is_configured(self) -> bool:
+        return google_is_configured()
+
+    async def authorize_redirect(self, request, redirect_uri):
+        return await oauth.google.authorize_redirect(request, redirect_uri)
+
+    async def authorize_access_token(self, request):
+        return await oauth.google.authorize_access_token(request)
+
+    async def get_userinfo(self, token):
+        return await oauth.google.userinfo(token=token)
