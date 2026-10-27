@@ -61,6 +61,13 @@ class MessageResponse(BaseModel):
     message: str
 
 
+class BrokerOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    broker_id: int
+    broker_name: str
+
+
 class StockTradeCreate(BaseModel):
     stock_name: str = Field(min_length=1, max_length=20)
     stock_quantity: int = Field(gt=0)

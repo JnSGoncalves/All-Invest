@@ -167,6 +167,17 @@ def get_or_create_broker(db: Session, broker_name: str) -> models.Broker:
     return broker
 
 
+def list_user_brokers(db: Session, user_id: int) -> list[models.Broker]:
+    """Retorna corretoras vinculadas, mesmo que ainda não tenham operações."""
+    statement = (
+        select(models.Broker)
+        .join(models.UserBroker, models.UserBroker.broker_id == models.Broker.broker_id)
+        .where(models.UserBroker.user_id == user_id)
+        .order_by(models.Broker.broker_name, models.Broker.broker_id)
+    )
+    return list(db.scalars(statement))
+
+
 def get_broker_by_id(db: Session, broker_id: int) -> models.Broker | None:
     return db.get(models.Broker, broker_id)
 

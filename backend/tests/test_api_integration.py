@@ -10,7 +10,7 @@ substituídos; a ligação entre os componentes é a mesma da produção
 import pytest
 from fastapi.testclient import TestClient
 
-from src import main
+from src import main, models
 from src.db.database import get_db
 from src.dependencies.auth import get_current_user
 from src.dependencies.components import get_market_data_service
@@ -127,5 +127,63 @@ def test_editar_carteira_sem_campos_retorna_422(client):
 
 def test_rotas_de_carteira_exigem_api_key(client):
     response = client.get("/api/portfolios", headers={"X-API-Key": "chave-errada"})
+
+    assert response.status_code == 401
+
+
+def test_listar_corretoras_somente_do_usuario(client, db, user, other_user):
+    db.add_all([
+        models.Broker(broker_id=101, broker_name="XP Investimentos"),
+        models.Broker(broker_id=102, broker_name="Clear"),
+        models.Broker(broker_id=103, broker_name="Outra corretora"),
+        models.Broker(broker_id=104, broker_name="Sem vínculo"),
+    ])
+    db.flush()
+    db.add_all([
+        models.UserBroker(user_id=user.user_id, broker_id=101),
+        models.UserBroker(user_id=user.user_id, broker_id=102),
+        models.UserBroker(user_id=other_user.user_id, broker_id=102),
+        models.UserBroker(user_id=other_user.user_id, broker_id=103),
+    ])
+    db.commit()
+
+    response = client.get("/api/brokers", params={"user_id": other_user.user_id})
+
+    assert response.status_code == 200
+    assert response.json() == [
+        {"broker_id": 102, "broker_name": "Clear"},
+        {"broker_id": 101, "broker_name": "XP Investimentos"},
+    ]
+
+
+def test_listar_corretoras_sem_vinculos_retorna_lista_vazia(client, db, other_user):
+    db.add(models.Broker(broker_id=101, broker_name="XP Investimentos"))
+    db.flush()
+    db.add(models.UserBroker(user_id=other_user.user_id, broker_id=101))
+    db.commit()
+
+    response = client.get("/api/brokers")
+
+    assert response.status_code == 200
+    assert response.json() == []
+
+
+@pytest.mark.parametrize("authorization", [None, "Bearer token-invalido"])
+def test_listar_corretoras_exige_autenticacao(client, authorization):
+    main.app.dependency_overrides.pop(get_current_user)
+    headers = {} if authorization is None else {"Authorization": authorization}
+
+    response = client.get("/api/brokers", headers=headers)
+
+    assert response.status_code == 401
+    assert response.headers["WWW-Authenticate"] == "Bearer"
+
+
+@pytest.mark.parametrize("api_key", [None, "chave-errada"])
+def test_listar_corretoras_exige_api_key(client, api_key):
+    client.headers.pop("X-API-Key", None)
+    headers = {} if api_key is None else {"X-API-Key": api_key}
+
+    response = client.get("/api/brokers", headers=headers)
 
     assert response.status_code == 401
