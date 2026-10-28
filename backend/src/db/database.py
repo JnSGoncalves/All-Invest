@@ -13,9 +13,12 @@ if not DATABASE_URL:
         "DATABASE_URL não configurada. Copie backend/.env.example para backend/.env e preencha uma connection string PostgreSQL válida."
     )
 
-# A conexão direta do Supabase usa IPv6. Em redes locais IPv4, esta opção
+# A conexão direta do Supabase usa IPv6. Para funcionar também em redes IPv4,
 # troca apenas host/usuário pelo Session pooler e preserva a senha existente.
-pooler_host = os.getenv("DATABASE_POOLER_HOST")
+# DATABASE_POOLER_HOST continua aceita como override (ex.: deploy).
+SUPABASE_POOLER_HOST = "aws-0-sa-east-1.pooler.supabase.com"
+
+pooler_host = os.getenv("DATABASE_POOLER_HOST") or SUPABASE_POOLER_HOST
 if pooler_host:
     database_url = make_url(DATABASE_URL)
     direct_host = database_url.host or ""

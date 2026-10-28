@@ -1,5 +1,6 @@
 """Contratos consumidos entre os componentes atualmente implementados."""
 
+from datetime import date
 from decimal import Decimal
 from typing import Any, Protocol
 
@@ -8,9 +9,12 @@ from fastapi.responses import RedirectResponse
 from .. import models
 from ..db.schemas import (
     AuthResponse,
+    BrokerCreate,
     PortfolioCreate,
     PortfolioUpdate,
     PositionOut,
+    ReturnPeriod,
+    ReturnsOut,
     StockTradeCreate,
     UserCreate,
 )
@@ -62,6 +66,12 @@ class IMarketDataService(Protocol):
     async def validate_ticker(self, stock_name: str) -> dict[str, Any]: ...
 
     async def get_quote(self, stock_name: str) -> Decimal: ...
+
+    async def get_price_history(
+        self, stock_name: str, start: date, end: date
+    ) -> list[tuple[date, Decimal]]:
+        """Fechamentos diários (data, preço) em ordem crescente, com cache."""
+        ...
 
     async def list_tickers(
         self,
@@ -126,6 +136,33 @@ class IPortfolioService(Protocol):
         ...
 
 
+class IBrokerService(Protocol):
+    """
+    Interface fornecida pelo Broker Component (catálogo global de corretoras).
+
+    As corretoras são compartilhadas por todos os usuários; o nome é único
+    sem diferenciar maiúsculas.
+    """
+
+    def list_brokers(self) -> list[models.Broker]:
+        """consultarCorretoras. Pós: todas as corretoras do catálogo, por nome."""
+        ...
+
+    def get_broker(self, broker_id: int) -> models.Broker:
+        """Pré: corretora cadastrada (senão 404)."""
+        ...
+
+    def create_broker(self, broker_in: BrokerCreate) -> models.Broker:
+        """cadastrarCorretora. Pré: nome ainda não cadastrado (senão 409).
+        Pós: corretora disponível para todos os usuários."""
+        ...
+
+    def delete_broker(self, broker_id: int) -> None:
+        """removerCorretora. Pré: corretora cadastrada (senão 404) e sem
+        operações registradas (senão 409). Pós: corretora e vínculos removidos."""
+        ...
+
+
 class IInvestmentService(Protocol):
     """
     Interface fornecida pelo Investment Component (Lab 3: IInvestmentService).
@@ -166,4 +203,23 @@ class IInvestmentService(Protocol):
     def remove_position(self, user_id: int, stock_name: str) -> int:
         """removerInvestimento. Pré: ativo existe na carteira do usuário (senão 404).
         Pós: operações e associação à carteira removidas; retorna o total apagado."""
+        ...
+
+
+class IReturnsService(Protocol):
+    """
+    Interface fornecida pelo Returns Component (HU08 - rendimentos).
+
+    Interfaces requeridas: IInvestmentService (operações do usuário),
+    IPortfolioService (carteira de cada ativo) e IMarketDataService
+    (cotações históricas).
+    """
+
+    async def get_returns(
+        self, user_id: int, period: ReturnPeriod, portfolio_id: int | None = None
+    ) -> ReturnsOut:
+        """consultarRendimento. Pré: se portfolio_id for informado, a carteira é
+        do usuário (senão 404).
+        Pós: ganho ou perda por ativo e total no período, com a série diária
+        (vazia em "max") e os ativos sem cotação listados em `unavailable`."""
         ...

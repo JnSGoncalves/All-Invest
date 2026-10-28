@@ -5,18 +5,22 @@ from sqlalchemy.orm import Session
 
 from ..interfaces import (
     IAuthService,
+    IBrokerService,
     IGoogleOAuthService,
     IInvestmentService,
     IMarketDataService,
     IPortfolioService,
+    IReturnsService,
     IUserService,
 )
 from ..db.database import get_db
 from ..services.auth_service import AuthService
+from ..services.broker_service import BrokerService
 from ..services.google.oauth_service import GoogleOAuthService
 from ..services.investment_service import InvestmentService
 from ..services.market_data_service import BrapiMarketDataService
 from ..services.portfolio_service import PortfolioService
+from ..services.returns_service import ReturnsService
 from ..services.user_service import UserService
 
 
@@ -43,6 +47,10 @@ def get_portfolio_service(db: Session = Depends(get_db)) -> IPortfolioService:
     return PortfolioService(db)
 
 
+def get_broker_service(db: Session = Depends(get_db)) -> IBrokerService:
+    return BrokerService(db)
+
+
 def get_investment_service(
     db: Session = Depends(get_db),
     market_data: IMarketDataService = Depends(get_market_data_service),
@@ -50,3 +58,11 @@ def get_investment_service(
 ) -> IInvestmentService:
     # O Investment Component recebe o Portfolio Component somente pela interface.
     return InvestmentService(db, market_data, portfolios)
+
+
+def get_returns_service(
+    investments: IInvestmentService = Depends(get_investment_service),
+    portfolios: IPortfolioService = Depends(get_portfolio_service),
+    market_data: IMarketDataService = Depends(get_market_data_service),
+) -> IReturnsService:
+    return ReturnsService(investments, portfolios, market_data)

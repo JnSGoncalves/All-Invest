@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Literal
 
@@ -160,6 +160,25 @@ class PortfolioOut(BaseModel):
     created_at: datetime
 
 
+class BrokerCreate(BaseModel):
+    broker_name: str = Field(min_length=1, max_length=150)
+
+    @field_validator("broker_name")
+    @classmethod
+    def normalize_name(cls, value: str) -> str:
+        name = " ".join(value.split())
+        if not name:
+            raise ValueError("O nome da corretora não pode ser vazio.")
+        return name
+
+
+class BrokerOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    broker_id: int
+    broker_name: str
+
+
 class PortfolioAssignment(BaseModel):
     portfolio_id: int = Field(gt=0)
 
@@ -188,6 +207,57 @@ class TickerListOut(BaseModel):
     total_pages: int
     total_items: int
     has_next_page: bool
+
+
+ReturnPeriod = Literal["1w", "1mo", "3mo", "max"]
+
+
+class AssetReturnOut(BaseModel):
+    """Rendimento de um ativo no período (HU08)."""
+
+    stock_name: str
+    company_name: str
+    portfolio_name: str | None = None
+    start_quantity: int
+    end_quantity: int
+    start_price: Decimal | None = Field(
+        default=None, description="Fechamento no início do período; nulo se não havia posição."
+    )
+    end_price: Decimal
+    start_value: Decimal
+    bought: Decimal = Field(description="Valor das compras feitas dentro do período.")
+    sold: Decimal = Field(description="Valor das vendas feitas dentro do período.")
+    end_value: Decimal
+    gain: Decimal = Field(description="Ganho (positivo) ou perda (negativo) em reais.")
+    gain_rate: Decimal | None = Field(
+        default=None,
+        description="Ganho sobre o capital do período (valor inicial + compras); 0.05 = 5%.",
+    )
+
+
+class ReturnPointOut(BaseModel):
+    date: date
+    invested: Decimal = Field(description="Valor inicial somado às compras e descontadas as vendas.")
+    value: Decimal = Field(description="Valor de mercado das posições no fechamento do dia.")
+    gain: Decimal
+
+
+class ReturnsOut(BaseModel):
+    period: ReturnPeriod
+    start_date: date | None = None
+    end_date: date | None = Field(default=None, description="Data da cotação mais recente usada.")
+    has_assets: bool = Field(description="Falso quando o usuário ainda não registrou operações.")
+    start_value: Decimal
+    bought: Decimal
+    sold: Decimal
+    end_value: Decimal
+    gain: Decimal
+    gain_rate: Decimal | None = None
+    assets: list[AssetReturnOut]
+    series: list[ReturnPointOut]
+    unavailable: list[str] = Field(
+        description="Ativos sem cotação disponível, fora dos totais."
+    )
 
 
 # Compatibilidade temporária para imports antigos.

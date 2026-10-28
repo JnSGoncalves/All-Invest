@@ -110,8 +110,8 @@ def revoke_all_refresh_tokens(db: Session, user_id: int) -> int:
 # ---------------------------------------------------------------------------
 # Suporte ao cadastro de operações (routers/stocks.py). O ticker em si já é
 # validado na B3 via services/market_data_service.py (brapi.dev); as funções
-# abaixo só garantem a linha correspondente no catálogo local (`stocks`,
-# `brokers`) para satisfazer as FKs de `users_stocks`.
+# abaixo garantem a linha correspondente em `stocks` para satisfazer as FKs de
+# `users_stocks`. As corretoras vêm do catálogo global (Broker Component).
 # ===========================================================================
 
 
@@ -142,33 +142,44 @@ def get_or_create_stock(db: Session, stock_name: str, company_name: str) -> mode
 
 
 def get_broker_by_name(db: Session, broker_name: str) -> models.Broker | None:
+    """Busca sem diferenciar maiúsculas, como o índice uq_brokers_name_lower."""
     return (
         db.query(models.Broker)
-        .filter(models.Broker.broker_name == broker_name)
+        .filter(func.lower(models.Broker.broker_name) == broker_name.lower())
         .first()
     )
 
 
-def get_or_create_broker(db: Session, broker_name: str) -> models.Broker:
-    """Garante a corretora usada pelo catálogo temporário no banco."""
-    broker = get_broker_by_name(db, broker_name)
-    if broker:
-        return broker
+def get_broker_by_id(db: Session, broker_id: int) -> models.Broker | None:
+    return db.get(models.Broker, broker_id)
 
-    try:
-        with db.begin_nested():
-            broker = models.Broker(broker_name=broker_name)
-            db.add(broker)
-            db.flush()
-    except IntegrityError:
-        broker = get_broker_by_name(db, broker_name)
-        if not broker:
-            raise
+
+def list_brokers(db: Session) -> list[models.Broker]:
+    return list(db.scalars(select(models.Broker).order_by(models.Broker.broker_name)))
+
+
+def create_broker(db: Session, broker_name: str) -> models.Broker:
+    broker = models.Broker(broker_name=broker_name)
+    db.add(broker)
+    db.commit()
+    db.refresh(broker)
     return broker
 
 
-def get_broker_by_id(db: Session, broker_id: int) -> models.Broker | None:
-    return db.get(models.Broker, broker_id)
+def broker_has_trades(db: Session, broker_id: int) -> bool:
+    statement = select(models.UserStock.stock_id).where(
+        models.UserStock.broker_id == broker_id
+    )
+    return db.scalars(statement.limit(1)).first() is not None
+
+
+def delete_broker(db: Session, broker: models.Broker) -> None:
+    """Remove a corretora e os vínculos em `users_brokers` (sem operações associadas)."""
+    db.execute(
+        delete(models.UserBroker).where(models.UserBroker.broker_id == broker.broker_id)
+    )
+    db.delete(broker)
+    db.commit()
 
 
 def ensure_user_broker(db: Session, *, user_id: int, broker_id: int) -> None:
@@ -242,9 +253,9 @@ def create_user_stock(
     """
     Persiste uma operação de compra/venda em `users_stocks`.
 
-    Commit único: como get_or_create_stock/broker usam apenas flush(), a
-    linha nova de stocks/brokers (se houver) e a operação em si são
-    gravadas juntas, na mesma transação.
+    Commit único: como get_or_create_stock e ensure_user_broker usam apenas
+    flush(), a linha nova de stocks/users_brokers (se houver) e a operação
+    em si são gravadas juntas, na mesma transação.
     """
     user_stock = models.UserStock(
         user_id=user_id,

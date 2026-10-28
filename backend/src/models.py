@@ -5,6 +5,7 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     ForeignKeyConstraint,
+    Index,
     Integer,
     Numeric,
     String,
@@ -85,10 +86,17 @@ class Stock(Base):
 
 
 class Broker(Base):
+    """Catálogo global de corretoras (Broker Component), compartilhado por todos os usuários."""
+
     __tablename__ = "brokers"
 
     broker_id = Column(Integer, primary_key=True, index=True)
-    broker_name = Column(String, nullable=False)
+    broker_name = Column(String(150), nullable=False)
+
+    # Ver database/migrations/003_brokers_catalog.sql.
+    __table_args__ = (
+        Index("uq_brokers_name_lower", func.lower(broker_name), unique=True),
+    )
 
 
 class UserStock(Base):

@@ -7,7 +7,6 @@ from ..dependencies.components import (
 )
 from ..dependencies.auth import CurrentUser, get_current_user
 from ..interfaces import IInvestmentService, IMarketDataService
-from ..services.investment_catalog import BROKER_IDS_BY_NAME
 
 router = APIRouter(
     prefix="/api/stocks",
@@ -22,11 +21,7 @@ def _trade_out(trade) -> dict:
         "company_name": trade.stock.company_name,
         "stock_quantity": trade.stock_quantity,
         "stock_price": trade.stock_price,
-        # O contrato público usa o ID provisório do catálogo mockado, e não
-        # a chave interna que o Supabase atribuiu à corretora.
-        "broker_id": BROKER_IDS_BY_NAME.get(
-            trade.broker.broker_name, trade.broker_id
-        ),
+        "broker_id": trade.broker_id,
         "broker_name": trade.broker.broker_name,
         "trade_side": trade.trade_side,
         "trade_date": trade.trade_date,

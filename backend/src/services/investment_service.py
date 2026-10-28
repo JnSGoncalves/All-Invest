@@ -10,7 +10,6 @@ from sqlalchemy.orm import Session
 from .. import models
 from ..db import crud, schemas
 from ..interfaces import IMarketDataService, IPortfolioService
-from .investment_catalog import MOCK_BROKERS
 
 
 class InvestmentService:
@@ -40,8 +39,8 @@ class InvestmentService:
             else trade_in.stock_price
         )
 
-        broker_name = MOCK_BROKERS.get(trade_in.broker_id)
-        if broker_name is None:
+        broker = crud.get_broker_by_id(self._db, trade_in.broker_id)
+        if broker is None:
             raise HTTPException(status_code=400, detail="Corretora não cadastrada.")
 
         try:
@@ -59,7 +58,6 @@ class InvestmentService:
                     )
 
             stock = crud.get_or_create_stock(self._db, ticker, company_name)
-            broker = crud.get_or_create_broker(self._db, broker_name)
             crud.ensure_user_broker(
                 self._db, user_id=user_id, broker_id=broker.broker_id
             )
