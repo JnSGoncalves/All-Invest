@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Literal
 
@@ -61,6 +61,18 @@ class MessageResponse(BaseModel):
     message: str
 
 
+class BrokerCreate(BaseModel):
+    broker_name: str = Field(min_length=1, max_length=150)
+
+    @field_validator("broker_name")
+    @classmethod
+    def normalize_name(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("Informe o nome da corretora.")
+        return value
+
+
 class BrokerOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -73,6 +85,7 @@ class StockTradeCreate(BaseModel):
     stock_quantity: int = Field(gt=0)
     stock_price: Decimal | None = Field(default=None, gt=0, max_digits=15, decimal_places=4)
     broker_id: int = Field(gt=0)
+    broker_source: Literal["catalog", "registered"] = "catalog"
     trade_side: Literal["BUY", "SELL"]
     trade_date: datetime | None = None
     auto_cotacao: bool = False
@@ -122,6 +135,53 @@ class PositionOut(BaseModel):
     preco_medio: Decimal
     portfolio_id: int | None = None
     portfolio_name: str | None = None
+
+
+class PositionPage(BaseModel):
+    results: list[PositionOut]
+    page: int
+    total_pages: int
+    total_items: int
+    total_quantity: int
+    total_invested: Decimal
+
+
+class TradeUpdate(BaseModel):
+    stock_quantity: int = Field(gt=0)
+    stock_price: Decimal = Field(gt=0, max_digits=15, decimal_places=4)
+    trade_side: Literal["BUY", "SELL"]
+
+
+class IncomeCreate(BaseModel):
+    stock_name: str = Field(min_length=1, max_length=20)
+    amount: Decimal = Field(gt=0, max_digits=15, decimal_places=4)
+    received_at: datetime
+    kind: Literal["DIVIDEND", "JCP", "OTHER"] = "DIVIDEND"
+
+    @field_validator("received_at")
+    @classmethod
+    def require_timezone(cls, value: datetime) -> datetime:
+        if value.tzinfo is None:
+            raise ValueError("received_at deve incluir fuso horário.")
+        return value
+
+    @field_validator("stock_name")
+    @classmethod
+    def normalize_ticker(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("Informe o ativo.")
+        return value.strip().upper()
+
+
+class IncomeOut(IncomeCreate):
+    model_config = ConfigDict(from_attributes=True)
+    income_id: int
+
+    @field_validator("received_at")
+    @classmethod
+    def require_timezone(cls, value: datetime) -> datetime:
+        # SQLite devolve TIMESTAMP sem tzinfo; a persistência usa UTC.
+        return value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value
 
 
 class PortfolioCreate(BaseModel):

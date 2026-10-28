@@ -40,7 +40,13 @@ class InvestmentService:
             else trade_in.stock_price
         )
 
-        broker_name = MOCK_BROKERS.get(trade_in.broker_id)
+        registered_broker = None
+        if trade_in.broker_source == "registered":
+            link = self._db.get(models.UserBroker, (trade_in.broker_id, user_id))
+            if link is None:
+                raise HTTPException(404, "Corretora não encontrada na sua conta.")
+            registered_broker = link.broker
+        broker_name = registered_broker.broker_name if registered_broker else MOCK_BROKERS.get(trade_in.broker_id)
         if broker_name is None:
             raise HTTPException(status_code=400, detail="Corretora não cadastrada.")
 
@@ -59,7 +65,7 @@ class InvestmentService:
                     )
 
             stock = crud.get_or_create_stock(self._db, ticker, company_name)
-            broker = crud.get_or_create_broker(self._db, broker_name)
+            broker = registered_broker or crud.get_or_create_broker(self._db, broker_name)
             crud.ensure_user_broker(
                 self._db, user_id=user_id, broker_id=broker.broker_id
             )
@@ -97,6 +103,32 @@ class InvestmentService:
 
     def list_trades(self, user_id: int) -> list[models.UserStock]:
         return crud.get_user_stock_trades(self._db, user_id)
+
+    def update_trade(self, user_id: int, stock_name: str, trade_date: datetime,
+                     payload: schemas.TradeUpdate) -> models.UserStock:
+        if trade_date.tzinfo is None:
+            raise HTTPException(422, "trade_date deve incluir fuso horário.")
+        trades = list(self._db.query(models.UserStock).join(models.Stock).filter(
+            models.UserStock.user_id == user_id,
+            models.Stock.stock_name == stock_name.strip().upper(),
+        ).order_by(models.UserStock.trade_date).with_for_update().all())
+        def utc(value):
+            return value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value.astimezone(timezone.utc)
+        target = next((t for t in trades if utc(t.trade_date) == utc(trade_date)), None)
+        if target is None:
+            raise HTTPException(404, "Movimentação não encontrada.")
+        balance = 0
+        for trade in trades:
+            quantity = payload.stock_quantity if trade is target else trade.stock_quantity
+            side = payload.trade_side if trade is target else trade.trade_side
+            balance += quantity if side == "BUY" else -quantity
+            if balance < 0:
+                raise HTTPException(422, "A alteração deixaria uma venda sem saldo no histórico.")
+        for field, value in payload.model_dump().items():
+            setattr(target, field, value)
+        self._db.commit()
+        self._db.refresh(target)
+        return target
 
     def get_positions(
         self, user_id: int, portfolio_id: int | None = None

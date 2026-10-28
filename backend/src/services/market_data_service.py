@@ -100,7 +100,7 @@ async def validar_ticker(stock_name: str) -> dict:
     if correspondencia is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"O ativo '{ticker}' não foi encontrado na B3.",
+            detail="Tente novamente! Esse ativo não existe na B3.",
         )
 
     if not correspondencia.get("isActive", True):

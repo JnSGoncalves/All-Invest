@@ -10,7 +10,9 @@ import inspect
 
 import pytest
 
-from src.interfaces import IInvestmentService, IPortfolioService
+from src.interfaces import IInvestmentService, IPortfolioService, IBrokerService, IIncomeService
+from src.services.broker_service import BrokerService
+from src.services.income_service import IncomeService
 from src.services.investment_service import InvestmentService
 from src.services.portfolio_service import PortfolioService
 
@@ -25,8 +27,8 @@ def _operations(protocol) -> list[str]:
 
 @pytest.mark.parametrize(
     ("protocol", "implementation"),
-    [(IPortfolioService, PortfolioService), (IInvestmentService, InvestmentService)],
-    ids=["Portfolio", "Investment"],
+    [(IPortfolioService, PortfolioService), (IInvestmentService, InvestmentService), (IBrokerService, BrokerService), (IIncomeService, IncomeService)],
+    ids=["Portfolio", "Investment", "Broker", "Income"],
 )
 def test_implementacao_fornece_todas_as_operacoes_da_interface(protocol, implementation):
     for name in _operations(protocol):

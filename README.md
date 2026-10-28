@@ -214,6 +214,16 @@ Abra <http://localhost:4671> para o frontend e <http://localhost:4670/docs> para
 
 ## Funcionalidades incluídas
 
+### Listagem de corretoras (HU04)
+
+`GET /api/brokers` exige `X-API-Key` e `Authorization: Bearer <access_token>`.
+Retorna apenas as corretoras vinculadas ao usuário autenticado em `users_brokers`,
+ordenadas por nome, no formato `[{"broker_id": 1, "broker_name": "XP Investimentos"}]`.
+Sem vínculos, retorna HTTP 200 com `[]`. Os IDs desta listagem são os IDs reais do
+banco. Para usá-los em uma operação, envie `broker_source="registered"`.
+O valor padrão `catalog` mantém compatibilidade com os IDs provisórios anteriores.
+Os testes da rota estão em `backend/tests/test_api_integration.py`.
+
 - Cadastro de usuário e login por e-mail/senha.
 - Login com Google opcional, quando as credenciais OAuth estão configuradas.
 - Sessão com access token e renovação automática usando refresh token.
@@ -224,3 +234,36 @@ Abra <http://localhost:4671> para o frontend e <http://localhost:4670/docs> para
 - Remoção de um ticker e de seu histórico de movimentações da carteira autenticada.
 
 Ao remover um ticker, o backend apaga todas as operações daquele ticker pertencentes ao usuário atual e desfaz a associação com a carteira. A operação exige confirmação na interface.
+
+
+## Complementos dos cartões concluídos
+
+- `POST /api/brokers`: recebe `broker_name`, valida o nome e vincula a corretora
+  ao usuário autenticado. Retorna 201; vínculo duplicado retorna 409.
+- `GET /api/stocks/carteira/paginada?page=1&limit=10`: posições ordenadas por
+  ticker, metadados de paginação e totais de toda a carteira. A interface usa
+  esta rota; `/api/stocks/carteira` mantém o contrato anterior.
+- `PATCH /api/stocks/{ticker}/trades?trade_date=<ISO-8601 com fuso>`: corrige
+  `stock_quantity`, `stock_price` e `trade_side` de uma movimentação. A data
+  identifica a operação existente, junto com o ticker e o usuário autenticado.
+  Todos os três campos são obrigatórios. Rejeita correções que causariam saldo
+  negativo em qualquer ponto do histórico (422); operação alheia retorna 404.
+- `GET/POST /api/incomes` e `PUT/DELETE /api/incomes/{id}`: consulta, cadastro,
+  substituição e remoção de rendimentos recebidos. O payload contém `stock_name`,
+  `amount` (valor total recebido), `received_at` (ISO-8601 com fuso) e `kind`
+  (`DIVIDEND`, `JCP` ou `OTHER`). O ativo deve constar no histórico do usuário.
+  Esses lançamentos persistem mesmo após a remoção das operações do ativo.
+  Não representam cálculo de valorização histórica por período da HU08.
+
+Todas essas rotas exigem API key e Bearer token e isolam os dados por usuário.
+Para bancos existentes, execute `database/migrations/003_create_incomes.sql`.
+Novos bancos já recebem a tabela via `database/CreateTables.sql`.
+
+Os testes de API cobrem os novos fluxos e OAuth com provedor externo simulado,
+mas persistência, emissão de JWT e revogação de sessão reais. Não dependem de
+credenciais Google nem fazem chamadas externas. O tipo do ID da sessão usa
+INTEGER no SQLite de testes e continua BIGINT no PostgreSQL.
+
+Para testar a paginação visual, execute `npx playwright test` em `frontend`
+(com Microsoft Edge instalado). O teste inicia o Vite na porta 4175, simula
+as respostas da API e verifica navegação e preservação dos totais.

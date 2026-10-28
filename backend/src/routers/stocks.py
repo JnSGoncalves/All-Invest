@@ -1,4 +1,6 @@
-from fastapi import APIRouter, Depends, status
+from datetime import datetime, timezone
+from decimal import Decimal
+from fastapi import APIRouter, Depends, Query, status
 
 from ..db import schemas
 from ..dependencies.components import (
@@ -29,7 +31,7 @@ def _trade_out(trade) -> dict:
         ),
         "broker_name": trade.broker.broker_name,
         "trade_side": trade.trade_side,
-        "trade_date": trade.trade_date,
+        "trade_date": trade.trade_date.replace(tzinfo=timezone.utc) if trade.trade_date.tzinfo is None else trade.trade_date,
     }
 
 
@@ -75,6 +77,30 @@ def consultar_carteira(
 ):
     """Consolida quantidade e preço médio; `portfolio_id` filtra por carteira."""
     return investment_service.get_positions(current_user.user_id, portfolio_id)
+
+
+@router.get("/carteira/paginada", response_model=schemas.PositionPage)
+def listar_posicoes_paginadas(
+    current_user: CurrentUser,
+    page: int = Query(1, ge=1), limit: int = Query(10, ge=1, le=100),
+    investment_service: IInvestmentService = Depends(get_investment_service),
+):
+    positions = sorted(investment_service.get_positions(current_user.user_id), key=lambda p: p.stock_name)
+    return schemas.PositionPage(
+        results=positions[(page - 1) * limit:page * limit], page=page,
+        total_pages=max(1, (len(positions) + limit - 1) // limit), total_items=len(positions),
+        total_quantity=sum(p.stock_quantity for p in positions),
+        total_invested=sum((p.preco_medio * p.stock_quantity for p in positions), Decimal("0")),
+    )
+
+
+@router.patch("/{stock_name}/trades", response_model=schemas.StockTradeOut)
+def editar_movimentacao(
+    stock_name: str, trade_date: datetime, payload: schemas.TradeUpdate,
+    current_user: CurrentUser,
+    investment_service: IInvestmentService = Depends(get_investment_service),
+):
+    return _trade_out(investment_service.update_trade(current_user.user_id, stock_name, trade_date, payload))
 
 
 @router.put("/{stock_name}/portfolio", response_model=schemas.PositionOut)

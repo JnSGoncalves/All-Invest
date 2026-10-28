@@ -1,6 +1,8 @@
 """Contratos consumidos entre os componentes atualmente implementados."""
 
 from decimal import Decimal
+from datetime import datetime
+from ..db.schemas import TradeUpdate, BrokerCreate, IncomeCreate
 from typing import Any, Protocol
 
 from fastapi import Request
@@ -134,6 +136,9 @@ class IInvestmentService(Protocol):
     (validação do ticker e cotação).
     """
 
+    def update_trade(self, user_id: int, stock_name: str, trade_date: datetime,
+                     payload: TradeUpdate) -> models.UserStock: ...
+
     async def create_trade(
         self, user_id: int, trade_in: StockTradeCreate
     ) -> models.UserStock:
@@ -167,3 +172,14 @@ class IInvestmentService(Protocol):
         """removerInvestimento. Pré: ativo existe na carteira do usuário (senão 404).
         Pós: operações e associação à carteira removidas; retorna o total apagado."""
         ...
+
+
+class IBrokerService(Protocol):
+    def create(self, user_id: int, payload: BrokerCreate) -> models.Broker: ...
+
+
+class IIncomeService(Protocol):
+    def list(self, user_id: int) -> list[models.Income]: ...
+    def get(self, user_id: int, income_id: int) -> models.Income: ...
+    def save(self, user_id: int, payload: IncomeCreate, income_id: int | None = None) -> models.Income: ...
+    def delete(self, user_id: int, income_id: int) -> None: ...

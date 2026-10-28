@@ -52,7 +52,7 @@ class RefreshToken(Base):
 
     __tablename__ = "refresh_tokens"
 
-    token_id = Column(BigInteger, primary_key=True, autoincrement=True)
+    token_id = Column(BigInteger().with_variant(Integer, "sqlite"), primary_key=True, autoincrement=True)
     user_id = Column(
         Integer,
         ForeignKey("users.user_id", ondelete="CASCADE"),
@@ -89,6 +89,21 @@ class Broker(Base):
 
     broker_id = Column(Integer, primary_key=True, index=True)
     broker_name = Column(String, nullable=False)
+
+
+class Income(Base):
+    __tablename__ = "investment_incomes"
+
+    income_id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.user_id"), nullable=False, index=True)
+    stock_name = Column(String(20), nullable=False)
+    amount = Column(Numeric(15, 4), nullable=False)
+    received_at = Column(DateTime(timezone=True), nullable=False)
+    kind = Column(String(20), nullable=False)
+    __table_args__ = (
+        CheckConstraint("amount > 0", name="chk_income_amount"),
+        CheckConstraint("kind IN ('DIVIDEND', 'JCP', 'OTHER')", name="chk_income_kind"),
+    )
 
 
 class UserStock(Base):

@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
-import { createTrade, getPositions, removePosition, type Position } from "../services/api";
+import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { createTrade, getPositionPage, removePosition, type Position } from "../services/api";
 import { useAuth } from "../contexts/auth-context";
 import "./Home.css";
 
@@ -23,6 +23,8 @@ function Icon({ name }: { name: "grid" | "wallet" | "chart" | "settings" | "plus
 export default function Home() {
   const { user, logout } = useAuth();
   const [positions, setPositions] = useState<Position[]>([]);
+  const [page, setPage] = useState(1);
+  const [summary, setSummary] = useState({ total_pages: 1, total_items: 0, total_quantity: 0, total_invested: 0 });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
@@ -36,24 +38,24 @@ export default function Home() {
 
   const refreshPositions = useCallback(async () => {
     setError(null);
-    try { setPositions(await getPositions()); }
+    try { const data = await getPositionPage(page); setPositions(data.results); setSummary(data); if (page > data.total_pages) setPage(data.total_pages); }
     catch (reason) { setError(reason instanceof Error ? reason.message : "Não foi possível carregar sua carteira."); }
     finally { setLoading(false); }
-  }, []);
+  }, [page]);
 
   useEffect(() => {
     let active = true;
-    getPositions()
-      .then((data) => { if (active) setPositions(data); })
+    getPositionPage(page)
+      .then((data) => { if (active) { setPositions(data.results); setSummary(data); } })
       .catch((reason: unknown) => {
         if (active) setError(reason instanceof Error ? reason.message : "Não foi possível carregar sua carteira.");
       })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, []);
+  }, [page]);
 
-  const totalInvested = useMemo(() => positions.reduce((sum, position) => sum + position.preco_medio * position.stock_quantity, 0), [positions]);
-  const totalShares = useMemo(() => positions.reduce((sum, position) => sum + position.stock_quantity, 0), [positions]);
+  const totalInvested = summary.total_invested;
+  const totalShares = summary.total_quantity;
 
   async function handleTrade(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); setError(null); setNotice(null); setSaving(true);
@@ -106,13 +108,14 @@ export default function Home() {
 
           <section className="summary-grid" aria-label="Resumo da carteira">
             <article className="summary-card featured-card"><div className="summary-top"><span>VALOR APLICADO</span><span className="summary-icon gold-icon"><Icon name="wallet"/></span></div><strong>{loading ? "—" : currency.format(totalInvested)}</strong><small>Com base no preço médio das posições</small></article>
-            <article className="summary-card"><div className="summary-top"><span>ATIVOS NA CARTEIRA</span><span className="summary-icon teal-icon"><Icon name="chart"/></span></div><strong>{loading ? "—" : positions.length.toString().padStart(2, "0")}</strong><small>Ações com posição aberta</small><div className="summary-meta"><span className="meta-dot"/> Seus ativos</div></article>
+            <article className="summary-card"><div className="summary-top"><span>ATIVOS NA CARTEIRA</span><span className="summary-icon teal-icon"><Icon name="chart"/></span></div><strong>{loading ? "—" : summary.total_items.toString().padStart(2, "0")}</strong><small>Ações com posição aberta</small><div className="summary-meta"><span className="meta-dot"/> Seus ativos</div></article>
             <article className="summary-card"><div className="summary-top"><span>AÇÕES EM CUSTÓDIA</span><span className="summary-icon blue-icon"><Icon name="grid"/></span></div><strong>{loading ? "—" : totalShares.toLocaleString("pt-BR")}</strong><small>Total de unidades em carteira</small><div className="summary-meta">Quantidade registrada</div></article>
           </section>
 
           <section className="workspace-grid">
-            <article className="panel holdings-panel" id="carteira"><div className="panel-heading"><div><span className="eyebrow">ACOMPANHAMENTO</span><h2>Minha carteira</h2></div><span className="holdings-count">{positions.length} {positions.length === 1 ? "ativo" : "ativos"}</span></div>
+            <article className="panel holdings-panel" id="carteira"><div className="panel-heading"><div><span className="eyebrow">ACOMPANHAMENTO</span><h2>Minha carteira</h2></div><span className="holdings-count">{summary.total_items} {summary.total_items === 1 ? "ativo" : "ativos"}</span></div>
               {loading ? <div className="empty-state"><span className="loader"/>Carregando seus investimentos…</div> : positions.length === 0 ? <div className="empty-state"><span className="empty-icon"><Icon name="wallet"/></span><strong>Sua carteira começa aqui</strong><span>Registre sua primeira compra para acompanhar seus investimentos.</span></div> : <div className="table-wrap"><table className="holdings-table"><thead><tr><th>ATIVO</th><th>QUANTIDADE</th><th>PREÇO MÉDIO</th><th>VALOR APLICADO</th><th><span className="sr-only">Ações</span></th></tr></thead><tbody>{positions.map((position) => <tr key={position.stock_name}><td><div className="asset-cell"><span className="asset-badge">{position.stock_name.slice(0, 1)}</span><span><strong>{position.stock_name}</strong><small>{position.company_name}</small></span></div></td><td>{position.stock_quantity.toLocaleString("pt-BR")} <small className="table-muted">un.</small></td><td>{currency.format(position.preco_medio)}</td><td className="value-cell">{currency.format(position.preco_medio * position.stock_quantity)}</td><td><button className="icon-button remove-button" onClick={() => void handleRemove(position)} title={`Remover ${position.stock_name}`} aria-label={`Remover ${position.stock_name} e seu histórico`}><Icon name="trash"/></button></td></tr>)}</tbody></table></div>}
+              <nav className="panel-footer" aria-label="Paginação de ativos"><button disabled={loading || page <= 1} onClick={() => { setLoading(true); setPage(page - 1); }}>Anterior</button><span>Página {page} de {summary.total_pages}</span><button disabled={loading || page >= summary.total_pages} onClick={() => { setLoading(true); setPage(page + 1); }}>Próxima</button></nav>
               <div className="panel-footer"><span>Os valores exibidos consideram o custo médio das operações.</span><a href="#registrar-acao">Registrar movimentação <Icon name="arrow"/></a></div>
             </article>
 
