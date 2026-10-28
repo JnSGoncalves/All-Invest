@@ -184,33 +184,75 @@ export async function getCurrentUser(): Promise<User> {
   return (await response.json()) as User;
 }
 
+export type TradeSide = "BUY" | "SELL";
+
 export interface Position {
   stock_name: string;
   company_name: string;
   stock_quantity: number;
   preco_medio: number;
+  portfolio_id: number | null;
+  portfolio_name: string | null;
 }
 
 export interface TradeInput {
   stock_name: string;
   stock_quantity: number;
-  stock_price: number;
+  stock_price?: number;
+  auto_cotacao?: boolean;
   broker_id: number;
-  trade_side: "BUY" | "SELL";
+  trade_side: TradeSide;
+  trade_date?: string;
+  portfolio_id?: number;
+}
+
+export interface Trade {
+  stock_name: string;
+  company_name: string;
+  stock_quantity: number;
+  stock_price: number;
+  broker_name: string;
+  trade_side: TradeSide;
+  trade_date: string;
+}
+
+export interface TickerSuggestion {
+  stock_name: string;
+  company_name: string;
+}
+
+export interface Portfolio {
+  portfolio_id: number;
+  portfolio_name: string;
+  description: string | null;
 }
 
 export async function getPositions(): Promise<Position[]> {
   const response = await authenticatedFetch("/api/stocks/carteira");
   if (!response.ok) throw await errorFromResponse(response);
-  return (await response.json()) as Position[];
+  // A API serializa Decimal como string; a tela trabalha com number.
+  const positions = (await response.json()) as Position[];
+  return positions.map((position) => ({
+    ...position,
+    stock_quantity: Number(position.stock_quantity),
+    preco_medio: Number(position.preco_medio),
+    portfolio_id: position.portfolio_id ?? null,
+    portfolio_name: position.portfolio_name ?? null,
+  }));
 }
 
-export async function createTrade(trade: TradeInput): Promise<void> {
+export async function createTrade(trade: TradeInput): Promise<Trade> {
   const response = await authenticatedFetch("/api/stocks", {
     method: "POST",
     body: JSON.stringify(trade),
   });
   if (!response.ok) throw await errorFromResponse(response);
+  const created = (await response.json()) as Trade;
+  return {
+    ...created,
+    stock_quantity: Number(created.stock_quantity),
+    stock_price: Number(created.stock_price),
+  };
 }
 
 export async function removePosition(stockName: string): Promise<void> {
@@ -219,6 +261,157 @@ export async function removePosition(stockName: string): Promise<void> {
     { method: "DELETE" },
   );
   if (!response.ok) throw await errorFromResponse(response);
+}
+
+export async function autocompleteTickers(
+  query: string,
+  signal?: AbortSignal,
+): Promise<TickerSuggestion[]> {
+  const params = new URLSearchParams({ q: query, limit: "8" });
+  const response = await authenticatedFetch(`/api/stocks/autocomplete?${params}`, { signal });
+  if (!response.ok) throw await errorFromResponse(response);
+  return (await response.json()) as TickerSuggestion[];
+}
+
+export async function validateTicker(stockName: string): Promise<TickerSuggestion> {
+  const response = await authenticatedFetch(
+    `/api/stocks/validar/${encodeURIComponent(stockName)}`,
+  );
+  if (!response.ok) throw await errorFromResponse(response);
+  return (await response.json()) as TickerSuggestion;
+}
+
+export async function assignPositionPortfolio(
+  stockName: string,
+  portfolioId: number,
+): Promise<void> {
+  const response = await authenticatedFetch(
+    `/api/stocks/${encodeURIComponent(stockName)}/portfolio`,
+    { method: "PUT", body: JSON.stringify({ portfolio_id: portfolioId }) },
+  );
+  if (!response.ok) throw await errorFromResponse(response);
+}
+
+export async function getPortfolios(): Promise<Portfolio[]> {
+  const response = await authenticatedFetch("/api/portfolios");
+  if (!response.ok) throw await errorFromResponse(response);
+  return (await response.json()) as Portfolio[];
+}
+
+export async function createPortfolio(
+  portfolioName: string,
+  description?: string,
+): Promise<Portfolio> {
+  const response = await authenticatedFetch("/api/portfolios", {
+    method: "POST",
+    body: JSON.stringify({ portfolio_name: portfolioName, description: description || null }),
+  });
+  if (!response.ok) throw await errorFromResponse(response);
+  return (await response.json()) as Portfolio;
+}
+
+export async function deletePortfolio(portfolioId: number): Promise<void> {
+  const response = await authenticatedFetch(`/api/portfolios/${portfolioId}`, {
+    method: "DELETE",
+  });
+  if (!response.ok) throw await errorFromResponse(response);
+}
+
+export interface Broker {
+  broker_id: number;
+  broker_name: string;
+}
+
+export async function getBrokers(): Promise<Broker[]> {
+  const response = await authenticatedFetch("/api/brokers");
+  if (!response.ok) throw await errorFromResponse(response);
+  return (await response.json()) as Broker[];
+}
+
+export async function createBroker(brokerName: string): Promise<Broker> {
+  const response = await authenticatedFetch("/api/brokers", {
+    method: "POST",
+    body: JSON.stringify({ broker_name: brokerName }),
+  });
+  if (!response.ok) throw await errorFromResponse(response);
+  return (await response.json()) as Broker;
+}
+
+export type ReturnPeriod = "1w" | "1mo" | "3mo" | "max";
+
+export interface AssetReturn {
+  stock_name: string;
+  company_name: string;
+  portfolio_name: string | null;
+  start_quantity: number;
+  end_quantity: number;
+  start_price: number | null;
+  end_price: number;
+  start_value: number;
+  bought: number;
+  sold: number;
+  end_value: number;
+  gain: number;
+  gain_rate: number | null;
+}
+
+export interface ReturnPoint {
+  date: string;
+  invested: number;
+  value: number;
+  gain: number;
+}
+
+export interface Returns {
+  period: ReturnPeriod;
+  start_date: string | null;
+  end_date: string | null;
+  has_assets: boolean;
+  start_value: number;
+  bought: number;
+  sold: number;
+  end_value: number;
+  gain: number;
+  gain_rate: number | null;
+  assets: AssetReturn[];
+  series: ReturnPoint[];
+  unavailable: string[];
+}
+
+const optionalNumber = (value: unknown) => (value === null || value === undefined ? null : Number(value));
+
+export async function getReturns(period: ReturnPeriod, signal?: AbortSignal): Promise<Returns> {
+  const params = new URLSearchParams({ periodo: period });
+  const response = await authenticatedFetch(`/api/rendimentos?${params}`, { signal });
+  if (!response.ok) throw await errorFromResponse(response);
+  // Valores monetários chegam como string (Decimal); a tela trabalha com number.
+  const body = (await response.json()) as Returns;
+  return {
+    ...body,
+    start_value: Number(body.start_value),
+    bought: Number(body.bought),
+    sold: Number(body.sold),
+    end_value: Number(body.end_value),
+    gain: Number(body.gain),
+    gain_rate: optionalNumber(body.gain_rate),
+    assets: body.assets.map((asset) => ({
+      ...asset,
+      start_price: optionalNumber(asset.start_price),
+      end_price: Number(asset.end_price),
+      start_value: Number(asset.start_value),
+      bought: Number(asset.bought),
+      sold: Number(asset.sold),
+      end_value: Number(asset.end_value),
+      gain: Number(asset.gain),
+      gain_rate: optionalNumber(asset.gain_rate),
+    })),
+    series: body.series.map((point) => ({
+      date: point.date,
+      invested: Number(point.invested),
+      value: Number(point.value),
+      gain: Number(point.gain),
+    })),
+  };
 }
 
 export async function logout(): Promise<void> {

@@ -54,6 +54,7 @@ backend/
 ├── pytest.ini
 └── requirements-dev.txt
 database/migrations/002_create_portfolios.sql   # Tabelas do Portfolio Component
+database/migrations/003_brokers_catalog.sql     # Catálogo global de corretoras
 docs/evidencias/                                # Saída da execução dos testes
 ```
 
@@ -85,6 +86,16 @@ As interfaces são `typing.Protocol` em [`backend/src/interfaces/components.py`]
 | consultarInvestimentos() | `list_trades(user_id)`, `get_positions(user_id, portfolio_id=None)` | `GET /api/stocks`, `GET /api/stocks/carteira?portfolio_id=` |
 | editarInvestimento() (associar ação à carteira) | `associate_position(user_id, stock_name, portfolio_id)` | `PUT /api/stocks/{ticker}/portfolio` |
 | removerInvestimento() | `remove_position(user_id, stock_name)` | `DELETE /api/stocks/{ticker}` |
+
+### `IBrokerService` (fornecida pelo Broker Component)
+
+Catálogo **global** de corretoras, compartilhado por todos os usuários. O nome é único sem diferenciar maiúsculas. O Investment Component recusa operações com `broker_id` fora do catálogo (400).
+
+| Operação | Método | Endpoint |
+|---|---|---|
+| consultarCorretoras() | `list_brokers()`, `get_broker(broker_id)` | `GET /api/brokers` |
+| cadastrarCorretora() | `create_broker(broker_in)` (nome repetido: 409) | `POST /api/brokers` |
+| removerCorretora() | `delete_broker(broker_id)` (com operações registradas: 409) | `DELETE /api/brokers/{id}` |
 
 Todas as rotas exigem `X-API-Key` e `Authorization: Bearer <access_token>`. Uma carteira de outro usuário é tratada como inexistente (404).
 
@@ -149,6 +160,7 @@ python -m pytest tests/test_integration_investment_portfolio.py tests/test_api_i
 
 1. No SQL Editor do Supabase, execute [`database/CreateTables.sql`](database/CreateTables.sql) para criar as tabelas (se ainda não existirem).
    Em um banco criado antes do Lab 4, execute apenas [`database/migrations/002_create_portfolios.sql`](database/migrations/002_create_portfolios.sql). Ela cria `portfolios` e `portfolios_stocks` sem alterar as tabelas existentes.
+   Em um banco criado antes do cadastro de corretoras, execute também [`database/migrations/003_brokers_catalog.sql`](database/migrations/003_brokers_catalog.sql). Ela torna o nome da corretora único e cadastra XP Investimentos, Rico, Clear e NuInvest, caso ainda não existam.
 2. Copie e preencha os arquivos locais de ambiente:
 
    ```powershell
@@ -219,6 +231,7 @@ Abra <http://localhost:4671> para o frontend e <http://localhost:4670/docs> para
 - Sessão com access token e renovação automática usando refresh token.
 - Carteira por usuário com resumo de posições e preço médio.
 - Registro de compra e venda com validação do ticker pela BRAPI.
+- Cadastro de corretoras em um catálogo global, direto do formulário de operação.
 - Carteiras do usuário (criar, listar, editar e remover) e associação de cada ativo a uma carteira.
 - Consulta das posições filtrada por carteira.
 - Remoção de um ticker e de seu histórico de movimentações da carteira autenticada.
