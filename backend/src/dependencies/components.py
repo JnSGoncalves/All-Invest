@@ -18,6 +18,9 @@ from ..services.investment_service import InvestmentService
 from ..services.market_data_service import BrapiMarketDataService
 from ..services.portfolio_service import PortfolioService
 from ..services.user_service import UserService
+from ..interfaces.components import IBrokerService, IIncomeService
+from ..services.broker_service import BrokerService
+from ..services.income_service import IncomeService
 
 
 def get_user_service(db: Session = Depends(get_db)) -> IUserService:
@@ -50,3 +53,11 @@ def get_investment_service(
 ) -> IInvestmentService:
     # O Investment Component recebe o Portfolio Component somente pela interface.
     return InvestmentService(db, market_data, portfolios)
+
+
+def get_broker_service(db: Session = Depends(get_db)) -> IBrokerService:
+    return BrokerService(db)
+
+
+def get_income_service(db: Session = Depends(get_db)) -> IIncomeService:
+    return IncomeService(db)

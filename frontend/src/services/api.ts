@@ -245,3 +245,19 @@ export async function logout(): Promise<void> {
     clearAuthSession();
   });
 }
+
+
+export interface PositionPage {
+  results: Position[];
+  page: number;
+  total_pages: number;
+  total_items: number;
+  total_quantity: number;
+  total_invested: number;
+}
+
+export async function getPositionPage(page: number): Promise<PositionPage> {
+  const response = await authenticatedFetch(`/api/stocks/carteira/paginada?page=${page}&limit=10`);
+  if (!response.ok) throw await errorFromResponse(response);
+  return (await response.json()) as PositionPage;
+}
