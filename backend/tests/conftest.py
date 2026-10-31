@@ -7,12 +7,13 @@ Supabase nem a brapi.dev, então rodam offline e sem o backend/.env.
 
 import os
 from decimal import Decimal
+from datetime import timedelta
 
 # Precisa vir antes de importar `src`: database.py e security.py leem o
 # ambiente no import, e load_dotenv não sobrescreve variáveis já definidas.
 os.environ["DATABASE_URL"] = "sqlite://"
 os.environ["ENVIRONMENT"] = "test"
-os.environ["SECRET_KEY"] = "chave-somente-para-testes"
+os.environ["SECRET_KEY"] = "chave-somente-para-testes-com-mais-de-32-bytes"
 os.environ["BRAPI_TOKEN"] = "token-de-teste"
 
 import pytest
@@ -22,6 +23,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from src import models
+from src.db.schemas import HistoricalPrice
 from src.db.database import Base
 from src.services.investment_service import InvestmentService
 from src.services.portfolio_service import PortfolioService
@@ -106,6 +108,11 @@ class FakeMarketDataService:
     async def get_quote(self, stock_name: str) -> Decimal:
         self.calls.append(("get_quote", stock_name))
         return self.quote
+
+    async def get_history(self, stock_name, start, end):
+        self.calls.append(("get_history", stock_name))
+        return [HistoricalPrice(date=start + timedelta(days=offset), close=self.quote)
+                for offset in range((end - start).days + 1)]
 
     async def list_tickers(self, search=None, tipo=None, page=1, limit=20) -> dict:
         return {"results": [], "page": 1, "total_pages": 1, "total_items": 0, "has_next_page": False}

@@ -64,7 +64,7 @@
 .panel-heading { display: flex; align-items: center; justify-content: space-between; padding: 19px 19px 16px; }
 .panel-heading h2 { margin: 6px 0 0; color: #1a273c; font: 700 16px "Manrope", sans-serif; letter-spacing: -.03em; }
 .holdings-count { padding: 6px 9px; border-radius: 5px; background: #f1f5f7; color: #6f7f91; font-size: 9px; font-weight: 600; }
-.table-wrap { overflow-x: auto; }
+.table-wrap { position: relative; overflow-x: auto; }
 .holdings-table { width: 100%; border-collapse: collapse; text-align: left; white-space: nowrap; }
 .holdings-table th { padding: 10px 11px; border-top: 1px solid #f0f2f5; border-bottom: 1px solid #edf0f3; background: #fafbfd; color: #98a2af; font-size: 8px; font-weight: 700; letter-spacing: .065em; }
 .holdings-table th:first-child, .holdings-table td:first-child { padding-left: 19px; }
@@ -127,3 +127,17 @@
 nav.panel-footer { align-items: center; flex-direction: row; }
 nav.panel-footer button { border: 1px solid #dce4e9; border-radius: 6px; background: white; color: #438d99; padding: 8px 12px; cursor: pointer; }
 nav.panel-footer button:disabled { opacity: .45; cursor: default; }
+
+.feature-panel { margin-top: 20px; padding-bottom: 20px; scroll-margin-top: 20px; }
+.feature-copy { margin: 16px 19px; color: #687589; font-size: 12px; line-height: 1.6; }
+.feature-error { color: #a44c43; }
+p.feature-error { margin: 12px 19px; font-size: 12px; }
+.feature-success { color: #377d60; }
+.broker-form { max-width: 500px; }
+.broker-form p { margin: 0; font-size: 12px; }
+.broker-list { display: flex; flex-wrap: wrap; gap: 10px; padding: 0 19px; list-style: none; }
+.broker-list li { padding: 10px 14px; border-radius: 6px; background: #eef6f6; color: #277e8d; font-size: 12px; }
+.period-filter { grid-template-columns: repeat(3, minmax(0, 1fr)); padding-top: 0; }
+.performance-summary { display: grid; gap: 8px; margin: 20px; color: #687589; font-size: 12px; }
+.performance-summary strong { font-size: 26px; }
+@media (max-width: 680px) { .period-filter { grid-template-columns: 1fr; } }

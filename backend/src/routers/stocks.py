@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from decimal import Decimal
 from fastapi import APIRouter, Depends, Query, status
 
@@ -6,9 +6,11 @@ from ..db import schemas
 from ..dependencies.components import (
     get_investment_service,
     get_market_data_service,
+    get_performance_service,
 )
 from ..dependencies.auth import CurrentUser, get_current_user
 from ..interfaces import IInvestmentService, IMarketDataService
+from ..interfaces.components import IPerformanceService
 from ..services.investment_catalog import BROKER_IDS_BY_NAME
 
 router = APIRouter(
@@ -77,6 +79,16 @@ def consultar_carteira(
 ):
     """Consolida quantidade e preço médio; `portfolio_id` filtra por carteira."""
     return investment_service.get_positions(current_user.user_id, portfolio_id)
+
+
+@router.get("/rendimentos", response_model=schemas.PerformanceOut)
+async def consultar_rendimento(
+    current_user: CurrentUser,
+    start: date, end: date,
+    performance: IPerformanceService = Depends(get_performance_service),
+):
+    """Ganho líquido entre datas inclusivas, descontando compras e somando vendas e proventos."""
+    return await performance.get_performance(current_user.user_id, start, end)
 
 
 @router.get("/carteira/paginada", response_model=schemas.PositionPage)

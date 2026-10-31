@@ -18,7 +18,8 @@ from ..services.investment_service import InvestmentService
 from ..services.market_data_service import BrapiMarketDataService
 from ..services.portfolio_service import PortfolioService
 from ..services.user_service import UserService
-from ..interfaces.components import IBrokerService, IIncomeService
+from ..interfaces.components import IBrokerService, IIncomeService, IPerformanceService
+from ..services.performance_service import PerformanceService
 from ..services.broker_service import BrokerService
 from ..services.income_service import IncomeService
 
@@ -61,3 +62,10 @@ def get_broker_service(db: Session = Depends(get_db)) -> IBrokerService:
 
 def get_income_service(db: Session = Depends(get_db)) -> IIncomeService:
     return IncomeService(db)
+
+
+def get_performance_service(
+    db: Session = Depends(get_db),
+    market_data: IMarketDataService = Depends(get_market_data_service),
+) -> IPerformanceService:
+    return PerformanceService(db, market_data)

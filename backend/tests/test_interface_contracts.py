@@ -15,6 +15,9 @@ from src.services.broker_service import BrokerService
 from src.services.income_service import IncomeService
 from src.services.investment_service import InvestmentService
 from src.services.portfolio_service import PortfolioService
+from src.interfaces.components import IPerformanceService, IMarketDataService
+from src.services.performance_service import PerformanceService
+from src.services.market_data_service import BrapiMarketDataService
 
 
 def _operations(protocol) -> list[str]:
@@ -27,8 +30,8 @@ def _operations(protocol) -> list[str]:
 
 @pytest.mark.parametrize(
     ("protocol", "implementation"),
-    [(IPortfolioService, PortfolioService), (IInvestmentService, InvestmentService), (IBrokerService, BrokerService), (IIncomeService, IncomeService)],
-    ids=["Portfolio", "Investment", "Broker", "Income"],
+    [(IPortfolioService, PortfolioService), (IInvestmentService, InvestmentService), (IBrokerService, BrokerService), (IIncomeService, IncomeService), (IPerformanceService, PerformanceService), (IMarketDataService, BrapiMarketDataService)],
+    ids=["Portfolio", "Investment", "Broker", "Income", "Performance", "MarketData"],
 )
 def test_implementacao_fornece_todas_as_operacoes_da_interface(protocol, implementation):
     for name in _operations(protocol):

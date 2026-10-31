@@ -1,75 +1,142 @@
-# Execução: 2026-10-03 16:55:46 — comando: python -m pytest -v (pasta backend/)
 ============================= test session starts =============================
-platform win32 -- Python 3.12.0, pytest-9.1.1, pluggy-1.6.0 -- C:\Users\WallaceIzidoro\Downloads\All-Invest-feature-validacao\All-Invest-feature-validacao\backend\.venv\Scripts\python.exe
-rootdir: C:\Users\WallaceIzidoro\Downloads\All-Invest-feature-validacao\All-Invest-feature-validacao\backend
+platform win32 -- Python 3.13.0, pytest-9.1.1, pluggy-1.7.0 -- E:\Projetos\Principal\All-Invest\venv\Scripts\python.exe
+cachedir: .pytest_cache
+rootdir: E:\Projetos\Principal\All-Invest\backend
 configfile: pytest.ini
 testpaths: tests
 plugins: anyio-4.15.1
-collecting ... collected 45 items
+collecting ... collected 112 items
 
-tests/test_api_integration.py::test_fluxo_completo_carteira_e_investimento PASSED [  2%]
-tests/test_api_integration.py::test_registrar_operacao_em_carteira_inexistente_retorna_404 PASSED [  4%]
-tests/test_api_integration.py::test_criar_carteira_com_nome_repetido_retorna_409 PASSED [  6%]
-tests/test_api_integration.py::test_editar_carteira_sem_campos_retorna_422 PASSED [  8%]
-tests/test_api_integration.py::test_rotas_de_carteira_exigem_api_key PASSED [ 11%]
-tests/test_integration_investment_portfolio.py::test_registrar_operacao_com_carteira_associa_ativo_no_portfolio PASSED [ 13%]
-tests/test_integration_investment_portfolio.py::test_associar_posicao_existente_e_mover_entre_carteiras PASSED [ 15%]
-tests/test_integration_investment_portfolio.py::test_consultar_posicoes_por_carteira PASSED [ 17%]
-tests/test_integration_investment_portfolio.py::test_remover_carteira_preserva_operacoes_e_desassocia_posicoes PASSED [ 20%]
-tests/test_integration_investment_portfolio.py::test_remover_investimento_remove_associacao_no_portfolio PASSED [ 22%]
-tests/test_integration_investment_portfolio.py::test_nao_associa_ativo_a_carteira_de_outro_usuario PASSED [ 24%]
-tests/test_integration_investment_portfolio.py::test_filtrar_por_carteira_inexistente_retorna_404 PASSED [ 26%]
+tests/test_api_integration.py::test_fluxo_completo_carteira_e_investimento PASSED [  0%]
+tests/test_api_integration.py::test_registrar_operacao_em_carteira_inexistente_retorna_404 PASSED [  1%]
+tests/test_api_integration.py::test_criar_carteira_com_nome_repetido_retorna_409 PASSED [  2%]
+tests/test_api_integration.py::test_editar_carteira_sem_campos_retorna_422 PASSED [  3%]
+tests/test_api_integration.py::test_rotas_de_carteira_exigem_api_key PASSED [  4%]
+tests/test_api_integration.py::test_listar_corretoras_somente_do_usuario PASSED [  5%]
+tests/test_api_integration.py::test_listar_corretoras_sem_vinculos_retorna_lista_vazia PASSED [  6%]
+tests/test_api_integration.py::test_listar_corretoras_exige_autenticacao[None] PASSED [  7%]
+tests/test_api_integration.py::test_listar_corretoras_exige_autenticacao[Bearer token-invalido] PASSED [  8%]
+tests/test_api_integration.py::test_listar_corretoras_exige_api_key[None] PASSED [  8%]
+tests/test_api_integration.py::test_listar_corretoras_exige_api_key[chave-errada] PASSED [  9%]
+tests/test_api_integration.py::test_cadastrar_corretora_e_utilizar_id_real PASSED [ 10%]
+tests/test_api_integration.py::test_cadastrar_corretora_valida_campos[payload0] PASSED [ 11%]
+tests/test_api_integration.py::test_cadastrar_corretora_valida_campos[payload1] PASSED [ 12%]
+tests/test_api_integration.py::test_cadastrar_corretora_valida_campos[payload2] PASSED [ 13%]
+tests/test_api_integration.py::test_paginacao_preserva_totais_e_isolamento PASSED [ 14%]
+tests/test_api_integration.py::test_editar_movimentacao_recalcula_e_protege_historico PASSED [ 15%]
+tests/test_api_integration.py::test_crud_rendimentos_e_isolamento PASSED [ 16%]
+tests/test_api_integration.py::test_mensagem_ativo_inexistente PASSED    [ 16%]
+tests/test_api_integration.py::test_oauth_fluxo_completo_com_provedor_simulado PASSED [ 17%]
+tests/test_api_integration.py::test_oauth_erros_nao_criam_sessao[unconfigured-503] PASSED [ 18%]
+tests/test_api_integration.py::test_oauth_erros_nao_criam_sessao[unverified-401] PASSED [ 19%]
+tests/test_api_integration.py::test_oauth_erros_nao_criam_sessao[denied-401] PASSED [ 20%]
+tests/test_api_integration.py::test_oauth_erros_nao_criam_sessao[state-401] PASSED [ 21%]
+tests/test_integration_investment_portfolio.py::test_registrar_operacao_com_carteira_associa_ativo_no_portfolio PASSED [ 22%]
+tests/test_integration_investment_portfolio.py::test_associar_posicao_existente_e_mover_entre_carteiras PASSED [ 23%]
+tests/test_integration_investment_portfolio.py::test_consultar_posicoes_por_carteira PASSED [ 24%]
+tests/test_integration_investment_portfolio.py::test_remover_carteira_preserva_operacoes_e_desassocia_posicoes PASSED [ 25%]
+tests/test_integration_investment_portfolio.py::test_remover_investimento_remove_associacao_no_portfolio PASSED [ 25%]
+tests/test_integration_investment_portfolio.py::test_nao_associa_ativo_a_carteira_de_outro_usuario PASSED [ 26%]
+tests/test_integration_investment_portfolio.py::test_filtrar_por_carteira_inexistente_retorna_404 PASSED [ 27%]
 tests/test_interface_contracts.py::test_implementacao_fornece_todas_as_operacoes_da_interface[Portfolio] PASSED [ 28%]
-tests/test_interface_contracts.py::test_implementacao_fornece_todas_as_operacoes_da_interface[Investment] PASSED [ 31%]
+tests/test_interface_contracts.py::test_implementacao_fornece_todas_as_operacoes_da_interface[Investment] PASSED [ 29%]
+tests/test_interface_contracts.py::test_implementacao_fornece_todas_as_operacoes_da_interface[Broker] PASSED [ 30%]
+tests/test_interface_contracts.py::test_implementacao_fornece_todas_as_operacoes_da_interface[Income] PASSED [ 31%]
+tests/test_interface_contracts.py::test_implementacao_fornece_todas_as_operacoes_da_interface[Performance] PASSED [ 32%]
+tests/test_interface_contracts.py::test_implementacao_fornece_todas_as_operacoes_da_interface[MarketData] PASSED [ 33%]
 tests/test_interface_contracts.py::test_interfaces_expoem_as_operacoes_do_lab3 PASSED [ 33%]
-tests/test_interface_contracts.py::test_investment_requer_portfolio_pelo_construtor PASSED [ 35%]
-tests/test_investment_component.py::test_create_trade_valida_ticker_e_persiste_compra PASSED [ 37%]
-tests/test_investment_component.py::test_create_trade_com_auto_cotacao_usa_preco_do_market_data PASSED [ 40%]
-tests/test_investment_component.py::test_create_trade_ticker_inexistente_retorna_404 PASSED [ 42%]
-tests/test_investment_component.py::test_create_trade_corretora_inexistente_retorna_400 PASSED [ 44%]
-tests/test_investment_component.py::test_create_trade_venda_acima_do_saldo_retorna_422 PASSED [ 46%]
-tests/test_investment_component.py::test_create_trade_com_carteira_valida_e_associa PASSED [ 48%]
-tests/test_investment_component.py::test_create_trade_com_carteira_inexistente_nao_grava_operacao PASSED [ 51%]
-tests/test_investment_component.py::test_get_positions_calcula_quantidade_e_preco_medio PASSED [ 53%]
-tests/test_investment_component.py::test_get_positions_oculta_ativo_zerado PASSED [ 55%]
-tests/test_investment_component.py::test_get_positions_isola_usuarios PASSED [ 57%]
-tests/test_investment_component.py::test_get_positions_filtra_por_carteira PASSED [ 60%]
-tests/test_investment_component.py::test_associate_position_retorna_posicao_com_carteira PASSED [ 62%]
-tests/test_investment_component.py::test_associate_position_sem_posicao_retorna_404 PASSED [ 64%]
-tests/test_investment_component.py::test_remove_position_apaga_operacoes_e_desassocia PASSED [ 66%]
-tests/test_investment_component.py::test_remove_position_inexistente_retorna_404 PASSED [ 68%]
-tests/test_portfolio_component.py::test_create_portfolio_persiste_carteira_do_usuario PASSED [ 71%]
-tests/test_portfolio_component.py::test_create_portfolio_rejeita_nome_repetido_sem_diferenciar_maiusculas PASSED [ 73%]
-tests/test_portfolio_component.py::test_create_portfolio_permite_mesmo_nome_para_usuarios_diferentes PASSED [ 75%]
-tests/test_portfolio_component.py::test_portfolio_create_rejeita_nome_vazio PASSED [ 77%]
-tests/test_portfolio_component.py::test_list_portfolios_retorna_somente_as_do_usuario_ordenadas PASSED [ 80%]
-tests/test_portfolio_component.py::test_get_portfolio_de_outro_usuario_retorna_404 PASSED [ 82%]
-tests/test_portfolio_component.py::test_update_portfolio_altera_somente_campos_enviados PASSED [ 84%]
-tests/test_portfolio_component.py::test_update_portfolio_rejeita_nome_de_outra_carteira PASSED [ 86%]
+tests/test_interface_contracts.py::test_investment_requer_portfolio_pelo_construtor PASSED [ 34%]
+tests/test_investment_component.py::test_create_trade_valida_ticker_e_persiste_compra PASSED [ 35%]
+tests/test_investment_component.py::test_create_trade_com_auto_cotacao_usa_preco_do_market_data PASSED [ 36%]
+tests/test_investment_component.py::test_create_trade_ticker_inexistente_retorna_404 PASSED [ 37%]
+tests/test_investment_component.py::test_create_trade_corretora_inexistente_retorna_400 PASSED [ 38%]
+tests/test_investment_component.py::test_create_trade_venda_acima_do_saldo_retorna_422 PASSED [ 39%]
+tests/test_investment_component.py::test_create_trade_com_carteira_valida_e_associa PASSED [ 40%]
+tests/test_investment_component.py::test_create_trade_com_carteira_inexistente_nao_grava_operacao PASSED [ 41%]
+tests/test_investment_component.py::test_get_positions_calcula_quantidade_e_preco_medio PASSED [ 41%]
+tests/test_investment_component.py::test_get_positions_oculta_ativo_zerado PASSED [ 42%]
+tests/test_investment_component.py::test_get_positions_isola_usuarios PASSED [ 43%]
+tests/test_investment_component.py::test_get_positions_filtra_por_carteira PASSED [ 44%]
+tests/test_investment_component.py::test_associate_position_retorna_posicao_com_carteira PASSED [ 45%]
+tests/test_investment_component.py::test_associate_position_sem_posicao_retorna_404 PASSED [ 46%]
+tests/test_investment_component.py::test_remove_position_apaga_operacoes_e_desassocia PASSED [ 47%]
+tests/test_investment_component.py::test_remove_position_inexistente_retorna_404 PASSED [ 48%]
+tests/test_market_history.py::test_contrato_real_http_e_cache_por_ativo_e_periodo PASSED [ 49%]
+tests/test_market_history.py::test_cache_expira_e_tem_limite PASSED      [ 50%]
+tests/test_market_history.py::test_erros_http_preservam_estado_sem_cache[400-502] PASSED [ 50%]
+tests/test_market_history.py::test_erros_http_preservam_estado_sem_cache[401-502] PASSED [ 51%]
+tests/test_market_history.py::test_erros_http_preservam_estado_sem_cache[403-502] PASSED [ 52%]
+tests/test_market_history.py::test_erros_http_preservam_estado_sem_cache[404-502] PASSED [ 53%]
+tests/test_market_history.py::test_erros_http_preservam_estado_sem_cache[429-429] PASSED [ 54%]
+tests/test_market_history.py::test_erros_http_preservam_estado_sem_cache[500-502] PASSED [ 55%]
+tests/test_market_history.py::test_dados_invalidos_nao_geram_precos_ficticios[data0] PASSED [ 56%]
+tests/test_market_history.py::test_dados_invalidos_nao_geram_precos_ficticios[data1] PASSED [ 57%]
+tests/test_market_history.py::test_dados_invalidos_nao_geram_precos_ficticios[data2] PASSED [ 58%]
+tests/test_market_history.py::test_dados_invalidos_nao_geram_precos_ficticios[data3] PASSED [ 58%]
+tests/test_market_history.py::test_dados_invalidos_nao_geram_precos_ficticios[data4] PASSED [ 59%]
+tests/test_market_history.py::test_dados_invalidos_nao_geram_precos_ficticios[data5] PASSED [ 60%]
+tests/test_market_history.py::test_erro_rede[ReadTimeout-504] PASSED     [ 61%]
+tests/test_market_history.py::test_erro_rede[ConnectError-502] PASSED    [ 62%]
+tests/test_market_history.py::test_json_invalido PASSED                  [ 63%]
+tests/test_performance_api.py::test_rendimento_fluxo_http_e_isolamento PASSED [ 64%]
+tests/test_performance_api.py::test_validacao_periodo_http[] PASSED      [ 65%]
+tests/test_performance_api.py::test_validacao_periodo_http[?start=errado&end=2026-09-30] PASSED [ 66%]
+tests/test_performance_api.py::test_validacao_periodo_http[?start=2026-09-30&end=2026-09-01] PASSED [ 66%]
+tests/test_performance_api.py::test_validacao_periodo_http[?start=2026-09-01&end=2999-01-01] PASSED [ 67%]
+tests/test_performance_api.py::test_rendimento_exige_api_key_e_sessao PASSED [ 68%]
+tests/test_performance_component.py::test_periodo_cruza_compras_vendas_e_proventos PASSED [ 69%]
+tests/test_performance_component.py::test_perda_e_soma_por_ativo PASSED  [ 70%]
+tests/test_performance_component.py::test_posicao_encerrada_no_periodo_preserva_ganho PASSED [ 71%]
+tests/test_performance_component.py::test_sem_ativos_e_isolamento_nao_consultam_fonte PASSED [ 72%]
+tests/test_performance_component.py::test_proventos_persistidos_sem_movimentacoes PASSED [ 73%]
+tests/test_performance_component.py::test_periodo_invalido[2026-09-30-2026-09-01] PASSED [ 74%]
+tests/test_performance_component.py::test_periodo_invalido[2026-01-01-2999-01-01] PASSED [ 75%]
+tests/test_performance_component.py::test_periodo_invalido[2000-01-01-2026-01-01] PASSED [ 75%]
+tests/test_performance_component.py::test_periodo_invalido[0001-01-01-0001-01-02] PASSED [ 76%]
+tests/test_performance_component.py::test_fuso_brasileiro_e_operacoes_futuras PASSED [ 77%]
+tests/test_performance_component.py::test_feriado_usa_fechamento_anterior_sem_olhar_futuro PASSED [ 78%]
+tests/test_performance_component.py::test_falta_cotacao_nao_inventa_rendimento PASSED [ 79%]
+tests/test_performance_component.py::test_operacao_com_fuso_persiste_instante_utc PASSED [ 80%]
+tests/test_portfolio_component.py::test_create_portfolio_persiste_carteira_do_usuario PASSED [ 81%]
+tests/test_portfolio_component.py::test_create_portfolio_rejeita_nome_repetido_sem_diferenciar_maiusculas PASSED [ 82%]
+tests/test_portfolio_component.py::test_create_portfolio_permite_mesmo_nome_para_usuarios_diferentes PASSED [ 83%]
+tests/test_portfolio_component.py::test_portfolio_create_rejeita_nome_vazio PASSED [ 83%]
+tests/test_portfolio_component.py::test_list_portfolios_retorna_somente_as_do_usuario_ordenadas PASSED [ 84%]
+tests/test_portfolio_component.py::test_get_portfolio_de_outro_usuario_retorna_404 PASSED [ 85%]
+tests/test_portfolio_component.py::test_update_portfolio_altera_somente_campos_enviados PASSED [ 86%]
+tests/test_portfolio_component.py::test_update_portfolio_rejeita_nome_de_outra_carteira PASSED [ 87%]
 tests/test_portfolio_component.py::test_portfolio_update_exige_ao_menos_um_campo PASSED [ 88%]
-tests/test_portfolio_component.py::test_delete_portfolio_remove_carteira_e_associacoes PASSED [ 91%]
-tests/test_portfolio_component.py::test_delete_portfolio_de_outro_usuario_retorna_404 PASSED [ 93%]
-tests/test_portfolio_component.py::test_associate_investment_associa_e_move_entre_carteiras PASSED [ 95%]
-tests/test_portfolio_component.py::test_associate_investment_em_carteira_de_outro_usuario_retorna_404 PASSED [ 97%]
-tests/test_portfolio_component.py::test_dissociate_investment_informa_se_havia_associacao PASSED [100%]
+tests/test_portfolio_component.py::test_delete_portfolio_remove_carteira_e_associacoes PASSED [ 89%]
+tests/test_portfolio_component.py::test_delete_portfolio_de_outro_usuario_retorna_404 PASSED [ 90%]
+tests/test_portfolio_component.py::test_associate_investment_associa_e_move_entre_carteiras PASSED [ 91%]
+tests/test_portfolio_component.py::test_associate_investment_em_carteira_de_outro_usuario_retorna_404 PASSED [ 91%]
+tests/test_portfolio_component.py::test_dissociate_investment_informa_se_havia_associacao PASSED [ 92%]
+tests/test_user_auth_api.py::test_cadastro_persiste_hash_login_e_conta_duplicada PASSED [ 93%]
+tests/test_user_auth_api.py::test_cadastro_invalido_nao_persiste[name- ] PASSED [ 94%]
+tests/test_user_auth_api.py::test_cadastro_invalido_nao_persiste[email-errado] PASSED [ 95%]
+tests/test_user_auth_api.py::test_cadastro_invalido_nao_persiste[password-123] PASSED [ 96%]
+tests/test_user_auth_api.py::test_cadastro_invalido_nao_persiste[password-\xe9\xe9\xe9\xe9\xe9\xe9\xe9\xe9\xe9\xe9\xe9\xe9\xe9\xe9\xe9\xe9\xe9\xe9\xe9\xe9\xe9\xe9\xe9\xe9\xe9\xe9\xe9\xe9\xe9\xe9\xe9\xe9\xe9\xe9\xe9\xe9\xe9\xe9\xe9\xe9] PASSED [ 97%]
+tests/test_user_auth_api.py::test_login_inexistente_sugere_cadastro PASSED [ 98%]
+tests/test_user_auth_api.py::test_renovacao_da_sessao_persistida_em_utc[False] PASSED [ 99%]
+tests/test_user_auth_api.py::test_renovacao_da_sessao_persistida_em_utc[True] PASSED [100%]
 
 ============================== warnings summary ===============================
-.venv\Lib\site-packages\fastapi\testclient.py:1
-  C:\Users\WallaceIzidoro\Downloads\All-Invest-feature-validacao\All-Invest-feature-validacao\backend\.venv\Lib\site-packages\fastapi\testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+..\venv\Lib\site-packages\fastapi\testclient.py:1
+  E:\Projetos\Principal\All-Invest\venv\Lib\site-packages\fastapi\testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
     from starlette.testclient import TestClient as TestClient  # noqa
 
-.venv\Lib\site-packages\starlette\testclient.py:53
-  C:\Users\WallaceIzidoro\Downloads\All-Invest-feature-validacao\All-Invest-feature-validacao\backend\.venv\Lib\site-packages\starlette\testclient.py:53: DeprecationWarning: The anyio.abc.BlockingPortal alias is deprecated, use anyio.from_thread.BlockingPortal instead.
+..\venv\Lib\site-packages\starlette\testclient.py:53
+  E:\Projetos\Principal\All-Invest\venv\Lib\site-packages\starlette\testclient.py:53: DeprecationWarning: The anyio.abc.BlockingPortal alias is deprecated, use anyio.from_thread.BlockingPortal instead.
     _PortalFactoryType = Callable[[], AbstractContextManager[anyio.abc.BlockingPortal]]
 
-.venv\Lib\site-packages\authlib\integrations\httpx_client\assertion_client.py:5
-  C:\Users\WallaceIzidoro\Downloads\All-Invest-feature-validacao\All-Invest-feature-validacao\backend\.venv\Lib\site-packages\authlib\integrations\httpx_client\assertion_client.py:5: AuthlibDeprecationWarning: The httpx module is deprecated; please use httpx2 instead.
+..\venv\Lib\site-packages\authlib\integrations\httpx_client\assertion_client.py:5
+  E:\Projetos\Principal\All-Invest\venv\Lib\site-packages\authlib\integrations\httpx_client\assertion_client.py:5: AuthlibDeprecationWarning: The httpx module is deprecated; please use httpx2 instead.
     from ._compat import httpx2
 
 tests/test_investment_component.py::test_create_trade_venda_acima_do_saldo_retorna_422
-  C:\Users\WallaceIzidoro\Downloads\All-Invest-feature-validacao\All-Invest-feature-validacao\backend\tests\test_investment_component.py:121: StarletteDeprecationWarning: 'HTTP_422_UNPROCESSABLE_ENTITY' is deprecated. Use 'HTTP_422_UNPROCESSABLE_CONTENT' instead.
+  E:\Projetos\Principal\All-Invest\backend\tests\test_investment_component.py:121: StarletteDeprecationWarning: 'HTTP_422_UNPROCESSABLE_ENTITY' is deprecated. Use 'HTTP_422_UNPROCESSABLE_CONTENT' instead.
     await service.create_trade(user.user_id, trade(qty=6, side="SELL", minutes=1))
 
 -- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
-- generated xml file: C:\Users\WallaceIzidoro\Downloads\All-Invest-feature-validacao\All-Invest-feature-validacao\docs\evidencias\resultado_testes.xml -
-======================= 45 passed, 4 warnings in 1.96s ========================
+- generated xml file: E:\Projetos\Principal\All-Invest\docs\evidencias\resultado_testes.xml -
+====================== 112 passed, 4 warnings in 13.60s =======================

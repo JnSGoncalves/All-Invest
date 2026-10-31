@@ -121,7 +121,7 @@ Os testes ficam em [`backend/tests/`](backend/tests/). Eles usam SQLite em memó
 | `test_api_integration.py` | Integração ponta a ponta (HTTP) | Fluxo pelas rotas: criar carteira, registrar compra com carteira, consultar por carteira, mover, editar e remover; erros 404, 409, 422 e API key inválida (401) |
 | `test_interface_contracts.py` | Contrato | As implementações expõem todas as operações das interfaces, com a mesma assinatura e o mesmo modo (síncrono/assíncrono); o Investment requer `IPortfolioService` |
 
-Resultado atual: **45 testes aprovados**. A saída completa está em [`docs/evidencias/resultado_testes.txt`](docs/evidencias/resultado_testes.txt), com versão JUnit XML no mesmo diretório. O workflow [`tests.yml`](.github/workflows/tests.yml) executa os testes a cada push.
+Resultado atual: **112 testes de backend aprovados**. A saída completa está em [`docs/evidencias/resultado_testes.txt`](docs/evidencias/resultado_testes.txt), com versão JUnit XML no mesmo diretório. O workflow [`tests.yml`](.github/workflows/tests.yml) executa backend, análise e compilação do frontend e testes Playwright a cada push e pull request.
 
 ### Executar os testes
 
@@ -253,7 +253,7 @@ Ao remover um ticker, o backend apaga todas as operações daquele ticker perten
   `amount` (valor total recebido), `received_at` (ISO-8601 com fuso) e `kind`
   (`DIVIDEND`, `JCP` ou `OTHER`). O ativo deve constar no histórico do usuário.
   Esses lançamentos persistem mesmo após a remoção das operações do ativo.
-  Não representam cálculo de valorização histórica por período da HU08.
+  Esses lançamentos são incluídos no cálculo separado de valorização por período da HU08.
 
 Todas essas rotas exigem API key e Bearer token e isolam os dados por usuário.
 Para bancos existentes, execute `database/migrations/003_create_incomes.sql`.
@@ -264,6 +264,34 @@ mas persistência, emissão de JWT e revogação de sessão reais. Não dependem
 credenciais Google nem fazem chamadas externas. O tipo do ID da sessão usa
 INTEGER no SQLite de testes e continua BIGINT no PostgreSQL.
 
-Para testar a paginação visual, execute `npx playwright test` em `frontend`
-(com Microsoft Edge instalado). O teste inicia o Vite na porta 4175, simula
-as respostas da API e verifica navegação e preservação dos totais.
+Para testar a interface, execute `npx playwright test` em `frontend` (com Microsoft
+Edge instalado e dependências Python de desenvolvimento disponíveis). Os testes
+iniciam Vite na porta 4175 e uma API isolada na 8175 com banco temporário. O fluxo
+completo usa cadastro, corretoras, ações, rendimentos e sessão reais; apenas o
+provedor de cotações é simulado. A paginação também tem um teste com respostas
+simuladas. Defina `BACKEND_PYTHON` para selecionar o Python; no Windows o teste
+reconhece `../venv/Scripts/python.exe`. No CI é usado Chromium.
+
+## Rendimentos por período (HU08)
+
+`GET /api/stocks/rendimentos?start=2026-09-01&end=2026-09-30` retorna valores
+inicial/final, compras, vendas, proventos registrados, ganho/perda e percentual,
+por ativo e para a carteira. Exige API key e sessão, valida datas e isola usuários.
+A tela permite escolher sete dias, trinta dias, um ano ou datas personalizadas.
+
+Ganho = valor final − valor inicial − compras + vendas + proventos registrados.
+O percentual divide esse ganho pelo valor inicial mais compras, sem anualização.
+O período usa dias inclusivos no horário de São Paulo e fechamentos anteriores
+às datas de avaliação, sem antecipar preços futuros.
+
+A integração BRAPI usa histórico diário com `includeRaw=true` e `rawClose`,
+necessários para valorar quantidades reais sem duplicar os ajustes de proventos.
+Esse recurso exige plano Pro segundo a [documentação BRAPI](https://brapi.dev/docs/acoes/historico).
+Cache em memória: 15 minutos, até 256 consultas por provedor/ticker/período.
+Sem cobertura, acesso ao plano ou preços válidos, a tela exibe erro.
+Não importa automaticamente eventos societários, taxas ou impostos; o histórico
+registrado precisa refletir mudanças nas quantidades.
+
+A conferência dos 33 cartões e 112 itens de checklist está em
+[`docs/auditoria-trello.md`](docs/auditoria-trello.md), incluindo evidências e
+limites da validação externa. Não foram aplicadas alterações no banco de produção.

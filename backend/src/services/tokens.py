@@ -1,3 +1,5 @@
+from datetime import timezone
+
 from sqlalchemy.orm import Session
 
 from .. import models
@@ -41,7 +43,11 @@ def rotate_refresh_token(db: Session, raw_refresh_token: str) -> schemas.AuthRes
     if not stored_token:
         raise InvalidRefreshTokenError
 
-    if stored_token.expire_at <= security.utc_now():
+    expires_at = stored_token.expire_at
+    # SQLite devolve TIMESTAMP sem fuso; os instantes persistidos são UTC.
+    if expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+    if expires_at <= security.utc_now():
         db.delete(stored_token)
         db.commit()
         raise InvalidRefreshTokenError

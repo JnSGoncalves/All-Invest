@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from decimal import Decimal
 from typing import Literal
 
@@ -16,6 +16,13 @@ class UserCreate(BaseModel):
     name: str = Field(min_length=1, max_length=120)
     email: EmailStr
     password: str = Field(min_length=8, max_length=72)
+
+    @field_validator("name")
+    @classmethod
+    def validate_name(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("Informe seu nome completo.")
+        return value.strip()
 
     @field_validator("password")
     @classmethod
@@ -144,6 +151,36 @@ class PositionPage(BaseModel):
     total_items: int
     total_quantity: int
     total_invested: Decimal
+
+
+class HistoricalPrice(BaseModel):
+    date: date
+    close: Decimal = Field(gt=0, allow_inf_nan=False)
+
+
+class AssetPerformance(BaseModel):
+    stock_name: str
+    opening_value: Decimal
+    closing_value: Decimal
+    purchases: Decimal
+    sales: Decimal
+    income: Decimal
+    gain: Decimal
+    return_percent: Decimal | None
+
+
+class PerformanceOut(BaseModel):
+    start: date
+    end: date
+    has_assets: bool
+    assets: list[AssetPerformance]
+    opening_value: Decimal
+    closing_value: Decimal
+    purchases: Decimal
+    sales: Decimal
+    income: Decimal
+    gain: Decimal
+    return_percent: Decimal | None
 
 
 class TradeUpdate(BaseModel):

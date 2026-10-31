@@ -11,15 +11,22 @@ Docs: https://brapi.dev/docs/tickers
 """
 
 import os
+from collections import OrderedDict
+from datetime import date, datetime, timezone
 from decimal import Decimal
+from time import monotonic
 from typing import Optional
 
 import httpx
 from fastapi import HTTPException, status
+from ..db.schemas import HistoricalPrice
 
 BRAPI_URL = os.getenv("BRAPI_URL", "https://brapi.dev/api/v2")
 BRAPI_TOKEN = os.getenv("BRAPI_TOKEN")
 _TIMEOUT = httpx.Timeout(10.0, connect=5.0)
+_HISTORY_CACHE: OrderedDict[tuple, tuple[float, tuple[HistoricalPrice, ...]]] = OrderedDict()
+_HISTORY_TTL = 900
+_HISTORY_CACHE_SIZE = 256
 
 
 async def _get(path: str, params: dict) -> dict:
@@ -65,8 +72,15 @@ async def _get(path: str, params: dict) -> dict:
             detail="Erro no serviço da brapi.dev.",
         )
 
-    response.raise_for_status()
-    return response.json()
+    if response.status_code >= 400:
+        raise HTTPException(502, "Recurso indisponível na brapi.dev. Verifique a cobertura e o plano contratado.")
+    try:
+        data = response.json()
+        if not isinstance(data, dict):
+            raise ValueError("Formato inválido")
+        return data
+    except ValueError as exc:
+        raise HTTPException(502, "Resposta inválida da brapi.dev.") from exc
 
 
 def _map_resultado(item: dict) -> dict:
@@ -206,6 +220,37 @@ class BrapiMarketDataService:
 
     async def get_quote(self, stock_name: str) -> Decimal:
         return await obter_cotacao(stock_name)
+
+    async def get_history(self, stock_name: str, start: date, end: date) -> list[HistoricalPrice]:
+        ticker = stock_name.strip().upper()
+        key = (BRAPI_URL, ticker, start, end)
+        cached = _HISTORY_CACHE.get(key)
+        if cached and cached[0] > monotonic():
+            _HISTORY_CACHE.move_to_end(key)
+            return [point.model_copy() for point in cached[1]]
+        # Quantidades reais exigem preços sem ajuste: close pode incluir proventos.
+        data = await _get("/stocks/historical", {
+            "symbols": ticker, "startDate": start.isoformat(), "endDate": end.isoformat(),
+            "interval": "1d", "sortOrder": "asc", "includeRaw": "true",
+        })
+        try:
+            result = next(item for item in data["results"]
+                          if item.get("requestedSymbol", item.get("symbol", "")).upper() == ticker)
+            points = {}
+            for item in result["data"]["historicalDataPrice"]:
+                day = datetime.fromtimestamp(item["date"], timezone.utc).date()
+                if start <= day <= end:
+                    points[day] = HistoricalPrice(date=day, close=item["rawClose"])
+            history = sorted(points.values(), key=lambda point: point.date)
+            if not history:
+                raise ValueError("Histórico vazio")
+        except (AttributeError, KeyError, TypeError, ValueError, StopIteration, OverflowError, OSError) as exc:
+            raise HTTPException(502, f"Histórico sem preços originais válidos para {ticker}.") from exc
+        _HISTORY_CACHE[key] = (monotonic() + _HISTORY_TTL, tuple(history))
+        _HISTORY_CACHE.move_to_end(key)
+        while len(_HISTORY_CACHE) > _HISTORY_CACHE_SIZE:
+            _HISTORY_CACHE.popitem(last=False)
+        return [point.model_copy() for point in history]
 
     async def list_tickers(
         self,

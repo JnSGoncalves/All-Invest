@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
-import { createTrade, getPositionPage, removePosition, type Position } from "../services/api";
+import { createTrade, getBrokers, getPositionPage, removePosition, type Broker, type Position } from "../services/api";
+import BrokerPanel from "../components/BrokerPanel";
+import PerformancePanel from "../components/PerformancePanel";
 import { useAuth } from "../contexts/auth-context";
 import "./Home.css";
 
@@ -29,12 +31,27 @@ export default function Home() {
   const [saving, setSaving] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(() => sessionStorage.getItem("allinvest.registration_notice"));
   const [ticker, setTicker] = useState("");
   const [quantity, setQuantity] = useState("");
   const [price, setPrice] = useState("");
-  const [broker, setBroker] = useState("1");
+  const [broker, setBroker] = useState("");
+  const [brokers, setBrokers] = useState<Broker[]>([]);
+  const [brokersLoading, setBrokersLoading] = useState(true);
+  const [brokersError, setBrokersError] = useState<string | null>(null);
+  const [revision, setRevision] = useState(0);
   const [side, setSide] = useState<"BUY" | "SELL">("BUY");
+
+  useEffect(() => {
+    sessionStorage.removeItem("allinvest.registration_notice");
+    let active = true;
+    getBrokers().then(data => {
+      if (active) { setBrokers(data); setBroker(data[0]?.broker_id.toString() ?? ""); }
+    }).catch((reason: unknown) => {
+      if (active) setBrokersError(reason instanceof Error ? reason.message : "Não foi possível carregar suas corretoras.");
+    }).finally(() => { if (active) setBrokersLoading(false); });
+    return () => { active = false; };
+  }, []);
 
   const refreshPositions = useCallback(async () => {
     setError(null);
@@ -60,7 +77,8 @@ export default function Home() {
   async function handleTrade(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); setError(null); setNotice(null); setSaving(true);
     try {
-      await createTrade({ stock_name: ticker.trim().toUpperCase(), stock_quantity: Number(quantity), stock_price: Number(price.replace(",", ".")), broker_id: Number(broker), trade_side: side });
+      await createTrade({ stock_name: ticker.trim().toUpperCase(), stock_quantity: Number(quantity), stock_price: Number(price.replace(",", ".")), broker_id: Number(broker), broker_source: "registered", trade_side: side });
+      setRevision(value => value + 1);
       setNotice(side === "BUY" ? "Compra registrada. Sua carteira foi atualizada." : "Venda registrada. Sua carteira foi atualizada.");
       setTicker(""); setQuantity(""); setPrice(""); setSide("BUY");
       await refreshPositions();
@@ -72,7 +90,7 @@ export default function Home() {
     const confirmed = window.confirm(`Remover ${position.stock_name} e todo o histórico de movimentações desta carteira? Esta ação não pode ser desfeita.`);
     if (!confirmed) return;
     setError(null); setNotice(null);
-    try { await removePosition(position.stock_name); setNotice(`${position.stock_name} foi removida da carteira.`); await refreshPositions(); }
+    try { await removePosition(position.stock_name); setRevision(value => value + 1); setNotice(`${position.stock_name} foi removida da carteira.`); await refreshPositions(); }
     catch (reason) { setError(reason instanceof Error ? reason.message : "Não foi possível remover o ativo."); }
   }
 
@@ -94,6 +112,8 @@ export default function Home() {
           <a className="side-link active" href="#visao-geral"><Icon name="grid"/><span>Visão geral</span></a>
           <a className="side-link" href="#carteira"><Icon name="wallet"/><span>Minha carteira</span></a>
           <a className="side-link" href="#registrar-acao"><Icon name="chart"/><span>Registrar ação</span></a>
+          <a className="side-link" href="#corretoras"><Icon name="wallet"/><span>Corretoras</span></a>
+          <a className="side-link" href="#rendimentos"><Icon name="chart"/><span>Rendimentos</span></a>
         </nav>
         <div className="sidebar-bottom"><button className="side-link logout-link" onClick={handleLogout} disabled={signingOut}><Icon name="logout"/><span>{signingOut ? "Saindo…" : "Sair da conta"}</span></button><div className="sidebar-user"><span className="avatar">{user.name.slice(0, 1).toUpperCase()}</span><span className="sidebar-user-copy"><strong>{user.name}</strong><small>Investidor</small></span><Icon name="settings"/></div></div>
       </aside>
@@ -124,12 +144,18 @@ export default function Home() {
                 <div className="side-toggle" role="group" aria-label="Tipo da operação"><button type="button" className={side === "BUY" ? "selected" : ""} onClick={() => setSide("BUY")}>Compra</button><button type="button" className={side === "SELL" ? "selected sell-selected" : ""} onClick={() => setSide("SELL")}>Venda</button></div>
                 <label>Ticker da ação<input value={ticker} onChange={(event) => setTicker(event.target.value.toUpperCase())} placeholder="Ex.: PETR4" autoComplete="off" required maxLength={20}/></label>
                 <div className="form-pair"><label>Quantidade<input type="number" value={quantity} onChange={(event) => setQuantity(event.target.value)} placeholder="0" min="1" step="1" required/></label><label>Preço por ação<input type="number" value={price} onChange={(event) => setPrice(event.target.value)} placeholder="0,00" min="0.0001" step="0.0001" required/></label></div>
-                <label>Corretora<select value={broker} onChange={(event) => setBroker(event.target.value)}><option value="1">XP Investimentos</option><option value="2">Rico</option><option value="3">Clear</option><option value="4">NuInvest</option></select></label>
+                <label>Corretora<select value={broker} onChange={(event) => setBroker(event.target.value)} required disabled={brokersLoading}><option value="">Selecione uma corretora</option>{brokers.map(item => <option key={item.broker_id} value={item.broker_id}>{item.broker_name}</option>)}</select></label>
+                {!brokersLoading && !brokers.length && <a href="#corretoras">Cadastre uma corretora para registrar ações.</a>}
                 <button className="trade-submit" type="submit" disabled={saving}>{saving ? "Registrando…" : side === "BUY" ? "Registrar compra" : "Registrar venda"}<Icon name="arrow"/></button>
               </form>
               <div className="trade-note"><span>i</span>O ticker será validado pela B3 antes de salvar.</div>
             </article>
           </section>
+          <BrokerPanel brokers={brokers} loading={brokersLoading} error={brokersError} onCreated={item => {
+            setBrokers(items => [...items.filter(b => b.broker_id !== item.broker_id), item].sort((a, b) => a.broker_name.localeCompare(b.broker_name)));
+            setBroker(String(item.broker_id)); setBrokersError(null);
+          }}/>
+          <PerformancePanel revision={revision}/>
           <footer className="dashboard-footer"><span>All Invest <span className="footer-dot">•</span> Dados seguros e vinculados à sua conta</span><span>Investir envolve riscos. Acompanhe seus ativos com atenção.</span></footer>
         </div>
       </main>

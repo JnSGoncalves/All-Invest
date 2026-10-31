@@ -1,7 +1,7 @@
 """Contratos consumidos entre os componentes atualmente implementados."""
 
 from decimal import Decimal
-from datetime import datetime
+from datetime import date, datetime
 from ..db.schemas import TradeUpdate, BrokerCreate, IncomeCreate
 from typing import Any, Protocol
 
@@ -10,6 +10,8 @@ from fastapi.responses import RedirectResponse
 from .. import models
 from ..db.schemas import (
     AuthResponse,
+    HistoricalPrice,
+    PerformanceOut,
     PortfolioCreate,
     PortfolioUpdate,
     PositionOut,
@@ -64,6 +66,8 @@ class IMarketDataService(Protocol):
     async def validate_ticker(self, stock_name: str) -> dict[str, Any]: ...
 
     async def get_quote(self, stock_name: str) -> Decimal: ...
+
+    async def get_history(self, stock_name: str, start: date, end: date) -> list["HistoricalPrice"]: ...
 
     async def list_tickers(
         self,
@@ -183,3 +187,7 @@ class IIncomeService(Protocol):
     def get(self, user_id: int, income_id: int) -> models.Income: ...
     def save(self, user_id: int, payload: IncomeCreate, income_id: int | None = None) -> models.Income: ...
     def delete(self, user_id: int, income_id: int) -> None: ...
+
+
+class IPerformanceService(Protocol):
+    async def get_performance(self, user_id: int, start: date, end: date) -> PerformanceOut: ...

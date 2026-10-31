@@ -9,6 +9,7 @@ export default function Login() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmation, setConfirmation] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
@@ -22,6 +23,8 @@ export default function Login() {
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
+    if (isRegister && password !== confirmation) { setError("A confirmação de senha deve ser igual à senha."); return; }
+    if (isRegister && !name.trim()) { setError("Informe seu nome completo."); return; }
     setSubmitting(true);
     try {
       if (isRegister) await register(name.trim(), email.trim(), password);
@@ -69,6 +72,7 @@ export default function Login() {
             {isRegister && <label>Nome completo<input value={name} onChange={(event) => setName(event.target.value)} autoComplete="name" placeholder="Como podemos chamar você?" required minLength={1} maxLength={120} /></label>}
             <label>E-mail<input type="email" value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="email" placeholder="voce@email.com" required /></label>
             <label>Senha<input type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete={isRegister ? "new-password" : "current-password"} placeholder={isRegister ? "Pelo menos 8 caracteres" : "Sua senha"} required minLength={isRegister ? 8 : 1} maxLength={72} /></label>
+            {isRegister && <label>Confirmar senha<input type="password" value={confirmation} onChange={event => setConfirmation(event.target.value)} autoComplete="new-password" required minLength={8} maxLength={72}/></label>}
             {error && <p className="auth-error" role="alert">{error}</p>}
             <button className="primary-button" type="submit" disabled={submitting || googleLoading}>
               {submitting ? "Aguarde…" : isRegister ? "Criar minha conta" : "Entrar na plataforma"}<span aria-hidden="true">↗</span>

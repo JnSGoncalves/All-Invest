@@ -150,6 +150,7 @@ export async function register(
   });
 
   if (!response.ok) throw await errorFromResponse(response);
+  sessionStorage.setItem("allinvest.registration_notice", "Cadastro realizado com sucesso.");
   return login(email, password);
 }
 
@@ -196,6 +197,7 @@ export interface TradeInput {
   stock_quantity: number;
   stock_price: number;
   broker_id: number;
+  broker_source?: "catalog" | "registered";
   trade_side: "BUY" | "SELL";
 }
 
@@ -260,4 +262,37 @@ export async function getPositionPage(page: number): Promise<PositionPage> {
   const response = await authenticatedFetch(`/api/stocks/carteira/paginada?page=${page}&limit=10`);
   if (!response.ok) throw await errorFromResponse(response);
   return (await response.json()) as PositionPage;
+}
+
+export interface Broker { broker_id: number; broker_name: string }
+
+export async function getBrokers(): Promise<Broker[]> {
+  const response = await authenticatedFetch("/api/brokers");
+  if (!response.ok) throw await errorFromResponse(response);
+  return response.json() as Promise<Broker[]>;
+}
+
+export async function createBroker(brokerName: string): Promise<Broker> {
+  const response = await authenticatedFetch("/api/brokers", {
+    method: "POST", body: JSON.stringify({ broker_name: brokerName }),
+  });
+  if (!response.ok) throw await errorFromResponse(response);
+  return response.json() as Promise<Broker>;
+}
+
+export interface PerformanceValues {
+  opening_value: number; closing_value: number; purchases: number; sales: number;
+  income: number; gain: number; return_percent: number | null;
+}
+
+export interface Performance extends PerformanceValues {
+  start: string; end: string; has_assets: boolean;
+  assets: (PerformanceValues & { stock_name: string })[];
+}
+
+export async function getPerformance(start: string, end: string): Promise<Performance> {
+  const params = new URLSearchParams({ start, end });
+  const response = await authenticatedFetch(`/api/stocks/rendimentos?${params}`);
+  if (!response.ok) throw await errorFromResponse(response);
+  return response.json() as Promise<Performance>;
 }

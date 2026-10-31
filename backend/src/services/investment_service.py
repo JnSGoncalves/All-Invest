@@ -77,7 +77,7 @@ class InvestmentService:
                 stock_quantity=trade_in.stock_quantity,
                 stock_price=stock_price,
                 trade_side=trade_in.trade_side,
-                trade_date=trade_in.trade_date or datetime.now(timezone.utc),
+                trade_date=(trade_in.trade_date or datetime.now(timezone.utc)).astimezone(timezone.utc),
             )
         except HTTPException:
             self._db.rollback()

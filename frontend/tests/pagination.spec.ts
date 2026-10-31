@@ -13,6 +13,8 @@ test('navega pelas posições mantendo o resumo da carteira', async ({ page }) =
       page: current, total_pages: 2, total_items: 11, total_quantity: 110, total_invested: 2200,
     } });
   });
+  await page.route('**/api/brokers', route => route.fulfill({ json: [] }));
+  await page.route('**/api/stocks/rendimentos?*', route => route.fulfill({ json: { has_assets: false } }));
   await page.goto('/');
   await expect(page.getByRole('cell', { name: 'P PETR4 Empresa', exact: true })).toBeVisible();
   const summary = page.getByRole('region', { name: 'Resumo da carteira' });
