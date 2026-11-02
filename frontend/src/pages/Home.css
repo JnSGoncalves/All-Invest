@@ -105,6 +105,7 @@
 
 /* Buttons */
 .ghost-button, .solid-button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 40px; padding: 0 14px; border-radius: 9px; font-size: 14px; font-weight: 600; cursor: pointer; transition: background .15s, border-color .15s, filter .15s; }
+.panel-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
 .ghost-button { border: 1px solid var(--line); background: #fff; color: var(--ink-2); }
 .ghost-button:hover:not(:disabled) { border-color: #c4d0dc; background: #f8fafc; }
 .solid-button { border: 0; background: var(--teal-600); color: #fff; }

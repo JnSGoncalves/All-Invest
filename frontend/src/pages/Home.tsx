@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   assignPositionPortfolio,
   deletePortfolio,
+  downloadPortfolioWorkbook,
   getBrokers,
   getPortfolios,
   getPositions,
@@ -54,6 +55,7 @@ export default function Home() {
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [highlight, setHighlight] = useState<string | null>(null);
   const [movingTicker, setMovingTicker] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
   const [dialog, setDialog] = useState<Dialog | null>(null);
   const [dialogBusy, setDialogBusy] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
@@ -218,6 +220,23 @@ export default function Home() {
     }
   }
 
+  async function handleExport() {
+    const portfolio = typeof filter === "number" ? portfolios?.find((item) => item.portfolio_id === filter) : undefined;
+    setExporting(true);
+    try {
+      await downloadPortfolioWorkbook(portfolio?.portfolio_id ?? null);
+      notify({
+        kind: "success",
+        title: "Planilha gerada",
+        message: portfolio ? `Carteira “${portfolio.portfolio_name}” exportada para Excel.` : "Todas as suas posições foram exportadas para Excel.",
+      });
+    } catch (reason) {
+      notify({ kind: "error", title: "Não foi possível gerar a planilha", message: errorMessage(reason, "Tente novamente.") });
+    } finally {
+      setExporting(false);
+    }
+  }
+
   async function handleLogout() {
     setSigningOut(true);
     try {
@@ -340,6 +359,8 @@ export default function Home() {
               loadError={loadError}
               highlight={highlight}
               movingTicker={movingTicker}
+              exporting={exporting}
+              onExport={() => void handleExport()}
               onFilterChange={setFilter}
               onRetry={() => { setLoading(true); void loadDashboard(); }}
               onBuy={(ticker, portfolioId) => openTrade("BUY", ticker, portfolioId ?? (typeof filter === "number" ? filter : null))}
