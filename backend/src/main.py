@@ -18,6 +18,7 @@ from .routers import stocks
 from .routers import portfolios
 from .routers import brokers
 from .routers import returns
+from .routers import incomes
 from starlette.middleware.sessions import SessionMiddleware
 
 app = FastAPI(
@@ -122,6 +123,7 @@ app.include_router(stocks.router)
 app.include_router(portfolios.router)
 app.include_router(brokers.router)
 app.include_router(returns.router)
+app.include_router(incomes.router)
 
 
 @app.get("/health", tags=["health"])

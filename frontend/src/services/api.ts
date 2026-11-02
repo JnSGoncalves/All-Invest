@@ -323,7 +323,7 @@ export interface Broker {
 }
 
 export async function getBrokers(): Promise<Broker[]> {
-  const response = await authenticatedFetch("/api/brokers");
+  const response = await authenticatedFetch("/api/brokers/catalogo");
   if (!response.ok) throw await errorFromResponse(response);
   return (await response.json()) as Broker[];
 }

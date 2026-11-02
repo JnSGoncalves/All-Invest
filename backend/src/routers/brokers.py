@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, status
 
 from ..db import schemas
-from ..dependencies.auth import get_current_user
+from ..dependencies.auth import CurrentUser, get_current_user
 from ..dependencies.components import get_broker_service
 from ..interfaces import IBrokerService
 
@@ -13,7 +13,16 @@ router = APIRouter(
 
 
 @router.get("", response_model=list[schemas.BrokerOut])
-def listar_corretoras(brokers: IBrokerService = Depends(get_broker_service)):
+def listar_corretoras(
+    current_user: CurrentUser,
+    brokers: IBrokerService = Depends(get_broker_service),
+):
+    """HU04: lista somente as corretoras vinculadas ao usuário autenticado."""
+    return brokers.list_user_brokers(current_user.user_id)
+
+
+@router.get("/catalogo", response_model=list[schemas.BrokerOut])
+def listar_catalogo(brokers: IBrokerService = Depends(get_broker_service)):
     """Lista o catálogo global de corretoras, em ordem alfabética."""
     return brokers.list_brokers()
 
@@ -21,10 +30,11 @@ def listar_corretoras(brokers: IBrokerService = Depends(get_broker_service)):
 @router.post("", response_model=schemas.BrokerOut, status_code=status.HTTP_201_CREATED)
 def cadastrar_corretora(
     broker_in: schemas.BrokerCreate,
+    current_user: CurrentUser,
     brokers: IBrokerService = Depends(get_broker_service),
 ):
-    """Cadastra uma corretora no catálogo, disponível para todos os usuários."""
-    return brokers.create_broker(broker_in)
+    """Cadastra a corretora no catálogo, se preciso, e a vincula ao usuário."""
+    return brokers.create_broker(current_user.user_id, broker_in)
 
 
 @router.delete("/{broker_id}", response_model=schemas.MessageResponse)

@@ -7,6 +7,7 @@ from ..interfaces import (
     IAuthService,
     IBrokerService,
     IGoogleOAuthService,
+    IIncomeService,
     IInvestmentService,
     IMarketDataService,
     IPortfolioService,
@@ -17,6 +18,7 @@ from ..db.database import get_db
 from ..services.auth_service import AuthService
 from ..services.broker_service import BrokerService
 from ..services.google.oauth_service import GoogleOAuthService
+from ..services.income_service import IncomeService
 from ..services.investment_service import InvestmentService
 from ..services.market_data_service import BrapiMarketDataService
 from ..services.portfolio_service import PortfolioService
@@ -66,3 +68,7 @@ def get_returns_service(
     market_data: IMarketDataService = Depends(get_market_data_service),
 ) -> IReturnsService:
     return ReturnsService(investments, portfolios, market_data)
+
+
+def get_income_service(db: Session = Depends(get_db)) -> IIncomeService:
+    return IncomeService(db)

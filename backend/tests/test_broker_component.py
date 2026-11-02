@@ -28,17 +28,30 @@ def test_get_broker_inexistente_retorna_404(broker_service):
 
 # --- create_broker (cadastrarCorretora) -------------------------------------
 
-def test_create_broker_normaliza_espacos_e_fica_no_catalogo(broker_service):
-    broker = broker_service.create_broker(BrokerCreate(broker_name="  BTG   Pactual "))
+def test_create_broker_normaliza_espacos_fica_no_catalogo_e_vincula(broker_service, user):
+    broker = broker_service.create_broker(user.user_id, BrokerCreate(broker_name="  BTG   Pactual "))
 
     assert broker.broker_id is not None
     assert broker.broker_name == "BTG Pactual"
     assert broker in broker_service.list_brokers()
+    assert broker_service.list_user_brokers(user.user_id) == [broker]
 
 
-def test_create_broker_rejeita_nome_repetido_sem_diferenciar_maiusculas(broker_service):
+def test_create_broker_reaproveita_nome_do_catalogo(broker_service, user):
+    total = len(broker_service.list_brokers())
+
+    broker = broker_service.create_broker(user.user_id, BrokerCreate(broker_name="rico"))
+
+    assert broker.broker_name == "Rico"
+    assert len(broker_service.list_brokers()) == total
+    assert broker_service.list_user_brokers(user.user_id) == [broker]
+
+
+def test_create_broker_rejeita_vinculo_repetido_sem_diferenciar_maiusculas(broker_service, user):
+    broker_service.create_broker(user.user_id, BrokerCreate(broker_name="Rico"))
+
     with pytest.raises(HTTPException) as exc:
-        broker_service.create_broker(BrokerCreate(broker_name="rico"))
+        broker_service.create_broker(user.user_id, BrokerCreate(broker_name="rico"))
 
     assert exc.value.status_code == 409
 
@@ -52,7 +65,7 @@ def test_broker_create_rejeita_nome_vazio():
 async def test_corretora_cadastrada_fica_disponivel_para_operacoes(
     broker_service, investment_service, user, other_user
 ):
-    broker = broker_service.create_broker(BrokerCreate(broker_name="Inter"))
+    broker = broker_service.create_broker(user.user_id, BrokerCreate(broker_name="Inter"))
 
     # Catálogo global: qualquer usuário pode operar pela corretora recém-criada.
     for owner in (user, other_user):
@@ -72,10 +85,9 @@ async def test_corretora_cadastrada_fica_disponivel_para_operacoes(
 # --- delete_broker (removerCorretora) ---------------------------------------
 
 def test_delete_broker_sem_operacoes_remove_do_catalogo(db, broker_service, user):
-    broker = broker_service.create_broker(BrokerCreate(broker_name="Modal"))
-    db.add(models.UserBroker(broker_id=broker.broker_id, user_id=user.user_id))
-    db.commit()
-    broker_id = broker.broker_id
+    broker_id = broker_service.create_broker(
+        user.user_id, BrokerCreate(broker_name="Modal")
+    ).broker_id
 
     broker_service.delete_broker(broker_id)
 

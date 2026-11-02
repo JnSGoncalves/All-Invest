@@ -2,6 +2,8 @@
 
 from datetime import date
 from decimal import Decimal
+from datetime import datetime
+from ..db.schemas import TradeUpdate, BrokerCreate, IncomeCreate
 from typing import Any, Protocol
 
 from fastapi import Request
@@ -141,20 +143,24 @@ class IBrokerService(Protocol):
     Interface fornecida pelo Broker Component (catálogo global de corretoras).
 
     As corretoras são compartilhadas por todos os usuários; o nome é único
-    sem diferenciar maiúsculas.
+    sem diferenciar maiúsculas. Cada usuário tem seus vínculos em `users_brokers`.
     """
 
     def list_brokers(self) -> list[models.Broker]:
         """consultarCorretoras. Pós: todas as corretoras do catálogo, por nome."""
         ...
 
+    def list_user_brokers(self, user_id: int) -> list[models.Broker]:
+        """HU04. Pós: somente as corretoras vinculadas ao usuário, por nome."""
+        ...
+
     def get_broker(self, broker_id: int) -> models.Broker:
         """Pré: corretora cadastrada (senão 404)."""
         ...
 
-    def create_broker(self, broker_in: BrokerCreate) -> models.Broker:
-        """cadastrarCorretora. Pré: nome ainda não cadastrado (senão 409).
-        Pós: corretora disponível para todos os usuários."""
+    def create_broker(self, user_id: int, broker_in: BrokerCreate) -> models.Broker:
+        """cadastrarCorretora. Pré: corretora ainda não vinculada ao usuário (senão 409).
+        Pós: corretora no catálogo, disponível para todos, e vinculada ao usuário."""
         ...
 
     def delete_broker(self, broker_id: int) -> None:
@@ -170,6 +176,9 @@ class IInvestmentService(Protocol):
     Interfaces requeridas: IPortfolioService (carteiras) e IMarketDataService
     (validação do ticker e cotação).
     """
+
+    def update_trade(self, user_id: int, stock_name: str, trade_date: datetime,
+                     payload: TradeUpdate) -> models.UserStock: ...
 
     async def create_trade(
         self, user_id: int, trade_in: StockTradeCreate
@@ -223,3 +232,10 @@ class IReturnsService(Protocol):
         Pós: ganho ou perda por ativo e total no período, com a série diária
         (vazia em "max") e os ativos sem cotação listados em `unavailable`."""
         ...
+
+
+class IIncomeService(Protocol):
+    def list(self, user_id: int) -> list[models.Income]: ...
+    def get(self, user_id: int, income_id: int) -> models.Income: ...
+    def save(self, user_id: int, payload: IncomeCreate, income_id: int | None = None) -> models.Income: ...
+    def delete(self, user_id: int, income_id: int) -> None: ...

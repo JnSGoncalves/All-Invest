@@ -194,7 +194,8 @@ export default function Home() {
   }
 
   function handleBrokerCreated(broker: Broker) {
-    setBrokers((current) => [...(current ?? []), broker].sort((a, b) => a.broker_name.localeCompare(b.broker_name, "pt-BR")));
+    // O nome pode já existir no catálogo: o cadastro devolve a mesma corretora, agora vinculada.
+    setBrokers((current) => [...(current ?? []).filter((item) => item.broker_id !== broker.broker_id), broker].sort((a, b) => a.broker_name.localeCompare(b.broker_name, "pt-BR")));
     setDialog(null);
     notify({ kind: "success", title: `Corretora “${broker.broker_name}” cadastrada`, message: "Ela já está selecionada no formulário de operação." });
     brokerCreated.current?.(broker);

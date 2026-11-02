@@ -518,3 +518,7 @@
   .returns-table td.num > .result-meta { justify-content: flex-start; }
   .returns-table td[data-label="Resultado"] { grid-column: 1 / -1; }
 }
+
+nav.panel-footer { align-items: center; flex-direction: row; }
+nav.panel-footer button { border: 1px solid #dce4e9; border-radius: 6px; background: white; color: #438d99; padding: 8px 12px; cursor: pointer; }
+nav.panel-footer button:disabled { opacity: .45; cursor: default; }

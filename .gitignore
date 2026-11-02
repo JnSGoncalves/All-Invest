@@ -475,3 +475,7 @@ venv/
 # OS
 .DS_Store
 Thumbs.db
+
+# Playwright artifacts
+frontend/test-results/
+frontend/playwright-report/

@@ -12,12 +12,14 @@ import pytest
 
 from src.interfaces import (
     IBrokerService,
+    IIncomeService,
     IInvestmentService,
     IMarketDataService,
     IPortfolioService,
     IReturnsService,
 )
 from src.services.broker_service import BrokerService
+from src.services.income_service import IncomeService
 from src.services.investment_service import InvestmentService
 from src.services.market_data_service import BrapiMarketDataService
 from src.services.portfolio_service import PortfolioService
@@ -40,8 +42,9 @@ def _operations(protocol) -> list[str]:
         (IMarketDataService, BrapiMarketDataService),
         (IReturnsService, ReturnsService),
         (IBrokerService, BrokerService),
+        (IIncomeService, IncomeService),
     ],
-    ids=["Portfolio", "Investment", "MarketData", "Returns", "Broker"],
+    ids=["Portfolio", "Investment", "MarketData", "Returns", "Broker", "Income"],
 )
 def test_implementacao_fornece_todas_as_operacoes_da_interface(protocol, implementation):
     for name in _operations(protocol):

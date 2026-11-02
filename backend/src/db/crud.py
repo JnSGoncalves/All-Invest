@@ -182,6 +182,17 @@ def delete_broker(db: Session, broker: models.Broker) -> None:
     db.commit()
 
 
+def list_user_brokers(db: Session, user_id: int) -> list[models.Broker]:
+    """Retorna corretoras vinculadas, mesmo que ainda não tenham operações."""
+    statement = (
+        select(models.Broker)
+        .join(models.UserBroker, models.UserBroker.broker_id == models.Broker.broker_id)
+        .where(models.UserBroker.user_id == user_id)
+        .order_by(models.Broker.broker_name, models.Broker.broker_id)
+    )
+    return list(db.scalars(statement))
+
+
 def ensure_user_broker(db: Session, *, user_id: int, broker_id: int) -> None:
     """Vincula a corretora existente à carteira do usuário, se necessário."""
     association = db.get(models.UserBroker, (broker_id, user_id))

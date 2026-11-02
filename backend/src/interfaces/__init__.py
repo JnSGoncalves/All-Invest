@@ -3,6 +3,7 @@
 from .components import (
     IAuthService,
     IBrokerService,
+    IIncomeService,
     IGoogleOAuthService,
     IInvestmentService,
     IMarketDataService,
@@ -14,6 +15,7 @@ from .components import (
 __all__ = [
     "IAuthService",
     "IBrokerService",
+    "IIncomeService",
     "IGoogleOAuthService",
     "IInvestmentService",
     "IMarketDataService",

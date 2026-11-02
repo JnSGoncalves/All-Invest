@@ -1,4 +1,4 @@
-import type { CSSProperties } from "react";
+import { useState, type CSSProperties } from "react";
 import type { Portfolio, Position } from "../../services/api";
 import Icon from "./Icon";
 
@@ -27,6 +27,7 @@ interface HoldingsPanelProps {
 const SERIES_COLORS = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300", "#6250d6"];
 const OTHER_COLOR = "#a3acb8";
 const POPULAR = ["PETR4", "VALE3", "ITUB4", "BBAS3", "WEGE3"];
+const PAGE_SIZE = 10;
 const currency = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 const quantityFormat = new Intl.NumberFormat("pt-BR");
 const percent = new Intl.NumberFormat("pt-BR", { style: "percent", minimumFractionDigits: 1, maximumFractionDigits: 1 });
@@ -48,6 +49,11 @@ export default function HoldingsPanel(props: HoldingsPanelProps) {
   const visibleTotal = visible.reduce((sum, position) => sum + valueOf(position), 0);
   const unassigned = positions.filter((position) => position.portfolio_id === null).length;
   const activePortfolio = typeof filter === "number" ? portfolios?.find((portfolio) => portfolio.portfolio_id === filter) : undefined;
+  const [requestedPage, setRequestedPage] = useState(1);
+  const totalPages = Math.max(1, Math.ceil(visible.length / PAGE_SIZE));
+  // Filtrar ou remover ativos pode encurtar a lista além da página aberta.
+  const page = Math.min(requestedPage, totalPages);
+  const pageRows = visible.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   const segments = visible.filter((position) => colorByTicker.has(position.stock_name)).map((position) => ({
     key: position.stock_name,
@@ -91,7 +97,7 @@ export default function HoldingsPanel(props: HoldingsPanelProps) {
                 role="tab"
                 aria-selected={filter === chip.value}
                 className={`chip ${filter === chip.value ? "active" : ""}`}
-                onClick={() => props.onFilterChange(chip.value)}
+                onClick={() => { setRequestedPage(1); props.onFilterChange(chip.value); }}
               >
                 {chip.value !== "all" && chip.value !== "none" && <Icon name="folder" size={14} />}
                 {chip.label}
@@ -191,7 +197,7 @@ export default function HoldingsPanel(props: HoldingsPanelProps) {
                 </tr>
               </thead>
               <tbody>
-                {visible.map((position) => {
+                {pageRows.map((position) => {
                   const share = visibleTotal > 0 ? valueOf(position) / visibleTotal : 0;
                   const color = colorByTicker.get(position.stock_name) ?? OTHER_COLOR;
                   return (
@@ -244,6 +250,14 @@ export default function HoldingsPanel(props: HoldingsPanelProps) {
               </tbody>
             </table>
           </div>
+
+          {totalPages > 1 && (
+            <nav className="panel-footer" aria-label="Paginação de ativos">
+              <button type="button" disabled={page <= 1} onClick={() => setRequestedPage(page - 1)}>Anterior</button>
+              <span>Página {page} de {totalPages}</span>
+              <button type="button" disabled={page >= totalPages} onClick={() => setRequestedPage(page + 1)}>Próxima</button>
+            </nav>
+          )}
         </>
       )}
 
