@@ -12,6 +12,7 @@ from ..interfaces import (
     IMarketDataService,
     IPerformanceService,
     IPortfolioService,
+    IReportService,
     IReturnsService,
     IUserService,
 )
@@ -24,6 +25,7 @@ from ..services.investment_service import InvestmentService
 from ..services.market_data_service import BrapiMarketDataService
 from ..services.performance_service import PerformanceService
 from ..services.portfolio_service import PortfolioService
+from ..services.report_service import ReportService
 from ..services.returns_service import ReturnsService
 from ..services.user_service import UserService
 
@@ -82,3 +84,12 @@ def get_performance_service(
 
 def get_income_service(db: Session = Depends(get_db)) -> IIncomeService:
     return IncomeService(db)
+
+
+def get_report_service(
+    investments: IInvestmentService = Depends(get_investment_service),
+    portfolios: IPortfolioService = Depends(get_portfolio_service),
+    incomes: IIncomeService = Depends(get_income_service),
+    performance: IPerformanceService = Depends(get_performance_service),
+) -> IReportService:
+    return ReportService(investments, portfolios, incomes, performance)
