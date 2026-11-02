@@ -18,16 +18,22 @@ os.environ["BRAPI_TOKEN"] = "token-de-teste"
 
 import pytest
 from fastapi import HTTPException, status
+from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from src import models
-from src.db.database import Base
+from src import main, models
+from src.db.database import Base, get_db
+from src.dependencies.auth import get_current_user
+from src.dependencies.components import get_market_data_service
+from src.services import performance_service
 from src.services.broker_service import BrokerService
 from src.services.investment_service import InvestmentService
+from src.services.performance_service import PerformanceService
 from src.services.portfolio_service import PortfolioService
 
+API_KEY = "chave-de-teste"
 DEFAULT_BROKERS = [(1, "XP Investimentos"), (2, "Rico"), (3, "Clear"), (4, "NuInvest")]
 
 
@@ -101,6 +107,8 @@ class FakeMarketDataService:
 
     def __init__(self, quote: Decimal = Decimal("38.50")) -> None:
         self.quote = quote
+        # ticker -> cotação ou exceção a levantar; ativos fora do dicionário usam `quote`.
+        self.quotes: dict[str, Decimal | Exception] = {}
         self.calls: list[tuple] = []
         # ticker -> [(data, fechamento)]; ativos fora do dicionário não têm histórico.
         self.histories: dict[str, list[tuple[date, Decimal]]] = {}
@@ -117,7 +125,10 @@ class FakeMarketDataService:
 
     async def get_quote(self, stock_name: str) -> Decimal:
         self.calls.append(("get_quote", stock_name))
-        return self.quote
+        quote = self.quotes.get(stock_name, self.quote)
+        if isinstance(quote, Exception):
+            raise quote
+        return quote
 
     async def get_price_history(self, stock_name: str, start: date, end: date) -> list[tuple[date, Decimal]]:
         self.calls.append(("get_price_history", stock_name, start, end))
@@ -155,3 +166,29 @@ def broker_service(db):
 def investment_service(db, market_data, portfolio_service):
     """Investment real integrado ao Portfolio real pela interface IPortfolioService."""
     return InvestmentService(db, market_data, portfolio_service)
+
+
+@pytest.fixture
+def performance_service_real(investment_service, portfolio_service, market_data):
+    """Performance real integrado aos componentes reais, com Market Data simulado."""
+    return PerformanceService(investment_service, portfolio_service, market_data)
+
+
+@pytest.fixture(autouse=True)
+def clean_quote_cache():
+    performance_service._QUOTE_CACHE.clear()
+
+
+@pytest.fixture
+def client(monkeypatch, db, user, market_data):
+    monkeypatch.setattr(main, "validate_api_key", lambda _db, key: key == API_KEY)
+    monkeypatch.setattr(main, "SessionLocal", lambda: db)
+    monkeypatch.setattr(db, "close", lambda: None)
+
+    main.app.dependency_overrides[get_db] = lambda: db
+    main.app.dependency_overrides[get_current_user] = lambda: user
+    main.app.dependency_overrides[get_market_data_service] = lambda: market_data
+
+    with TestClient(main.app, headers={"X-API-Key": API_KEY}) as test_client:
+        yield test_client
+    main.app.dependency_overrides.clear()

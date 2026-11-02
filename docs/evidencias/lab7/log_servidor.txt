@@ -1,0 +1,40 @@
+# Log do servidor (uvicorn) durante docs/evidencias/lab7/execucao_api.txt
+# Linhas 'Desempenho recalculado' = recálculo assíncrono depois de cada compra (BackgroundTasks).
+
+INFO:     Started server process [12756]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://cliente (Press CTRL+C to quit)
+INFO:     cliente - "GET /health HTTP/1.1" 200 OK
+INFO:     cliente - "GET /health HTTP/1.1" 200 OK
+INFO:     cliente - "POST /api/users HTTP/1.1" 201 Created
+INFO:     cliente - "POST /api/users HTTP/1.1" 201 Created
+INFO:     cliente - "POST /api/v1/auth/login HTTP/1.1" 200 OK
+INFO:     cliente - "POST /api/v1/auth/login HTTP/1.1" 200 OK
+INFO:     cliente - "POST /api/portfolios HTTP/1.1" 201 Created
+INFO:     cliente - "POST /api/portfolios HTTP/1.1" 201 Created
+INFO:     cliente - "GET /api/brokers/catalogo HTTP/1.1" 200 OK
+INFO:     cliente - "POST /api/stocks HTTP/1.1" 201 Created
+INFO:     Desempenho recalculado em segundo plano: usuário 1, 1 posição(ões), valor de mercado R$ 5271.00
+INFO:     cliente - "POST /api/stocks HTTP/1.1" 201 Created
+INFO:     Desempenho recalculado em segundo plano: usuário 1, 2 posição(ões), valor de mercado R$ 8372.00
+INFO:     cliente - "GET /api/performance/portfolios/1/positions HTTP/1.1" 200 OK
+INFO:     cliente - "GET /api/performance/portfolios/1/positions/PETR4 HTTP/1.1" 200 OK
+INFO:     cliente - "GET /api/performance/portfolios/1 HTTP/1.1" 200 OK
+INFO:     cliente - "GET /api/performance/portfolios/2/positions HTTP/1.1" 200 OK
+INFO:     cliente - "GET /api/performance/portfolios/1/positions HTTP/1.1" 401 Unauthorized
+INFO:     cliente - "GET /api/performance/portfolios/1/positions HTTP/1.1" 401 Unauthorized
+INFO:     cliente - "GET /api/performance/portfolios/1/positions HTTP/1.1" 401 Unauthorized
+INFO:     cliente - "GET /api/performance/portfolios/1/positions HTTP/1.1" 401 Unauthorized
+INFO:     cliente - "GET /api/performance/portfolios/999999/positions HTTP/1.1" 404 Not Found
+INFO:     cliente - "GET /api/performance/portfolios/1/positions HTTP/1.1" 404 Not Found
+INFO:     cliente - "GET /api/performance/portfolios/1/positions/ITUB4 HTTP/1.1" 404 Not Found
+INFO:     cliente - "GET /api/performance/portfolios/0/positions HTTP/1.1" 422 Unprocessable Entity
+INFO:     cliente - "GET /api/performance/portfolios/abc/positions HTTP/1.1" 422 Unprocessable Entity
+INFO:     cliente - "GET /docs HTTP/1.1" 200 OK
+INFO:     cliente - "GET /openapi.json HTTP/1.1" 200 OK
+INFO:     cliente - "GET /api/performance/portfolios/1/positions HTTP/1.1" 200 OK
+INFO:     cliente - "GET /api/performance/portfolios/1/positions/PETR4 HTTP/1.1" 200 OK
+INFO:     cliente - "GET /api/performance/portfolios/1 HTTP/1.1" 200 OK
+INFO:     cliente - "GET /api/performance/portfolios/999999/positions HTTP/1.1" 404 Not Found
+INFO:     cliente - "GET /api/performance/portfolios/0/positions HTTP/1.1" 422 Unprocessable Entity

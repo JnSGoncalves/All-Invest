@@ -11,29 +11,10 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 import pytest
-from fastapi.testclient import TestClient
 
 from src import main, models
-from src.db.database import get_db
 from src.dependencies.auth import get_current_user
 from src.dependencies.components import get_market_data_service
-
-API_KEY = "chave-de-teste"
-
-
-@pytest.fixture
-def client(monkeypatch, db, user, market_data):
-    monkeypatch.setattr(main, "validate_api_key", lambda _db, key: key == API_KEY)
-    monkeypatch.setattr(main, "SessionLocal", lambda: db)
-    monkeypatch.setattr(db, "close", lambda: None)
-
-    main.app.dependency_overrides[get_db] = lambda: db
-    main.app.dependency_overrides[get_current_user] = lambda: user
-    main.app.dependency_overrides[get_market_data_service] = lambda: market_data
-
-    with TestClient(main.app, headers={"X-API-Key": API_KEY}) as test_client:
-        yield test_client
-    main.app.dependency_overrides.clear()
 
 
 def test_fluxo_completo_carteira_e_investimento(client):

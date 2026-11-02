@@ -1,14 +1,15 @@
 from datetime import datetime, timezone
 from decimal import Decimal
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, BackgroundTasks, Depends, Query, status
 
 from ..db import schemas
 from ..dependencies.components import (
     get_investment_service,
     get_market_data_service,
+    get_performance_service,
 )
 from ..dependencies.auth import CurrentUser, get_current_user
-from ..interfaces import IInvestmentService, IMarketDataService
+from ..interfaces import IInvestmentService, IMarketDataService, IPerformanceService
 
 router = APIRouter(
     prefix="/api/stocks",
@@ -34,10 +35,13 @@ def _trade_out(trade) -> dict:
 async def cadastrar_operacao(
     trade_in: schemas.StockTradeCreate,
     current_user: CurrentUser,
+    background_tasks: BackgroundTasks,
     investment_service: IInvestmentService = Depends(get_investment_service),
+    performance: IPerformanceService = Depends(get_performance_service),
 ):
-    """Registra uma compra ou venda do usuário identificado pelo Bearer JWT."""
+    """Registra uma compra ou venda e aciona o recálculo do desempenho em segundo plano."""
     trade = await investment_service.create_trade(current_user.user_id, trade_in)
+    background_tasks.add_task(performance.recalculate, current_user.user_id)
     return _trade_out(trade)
 
 

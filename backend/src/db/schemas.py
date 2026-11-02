@@ -165,6 +165,73 @@ class IncomeOut(IncomeCreate):
         return value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value
 
 
+# Sem exemplo, o Swagger gera valores a partir do padrão do Decimal (centenas de dígitos).
+_VALUATION_EXAMPLE = {
+    "stock_name": "PETR4",
+    "company_name": "Petróleo Brasileiro S.A. - Petrobras",
+    "stock_quantity": 100,
+    "preco_medio": "30.0000",
+    "portfolio_id": 1,
+    "portfolio_name": "Dividendos",
+    "current_price": "33.00",
+    "invested_value": "3000.00",
+    "market_value": "3300.00",
+}
+_PERFORMANCE_EXAMPLE = {**_VALUATION_EXAMPLE, "gain": "300.00", "profitability_pct": "10.00"}
+
+
+class PositionValuationOut(PositionOut):
+    """Posição avaliada a preço de mercado (avaliarPosicoes)."""
+
+    model_config = ConfigDict(json_schema_extra={"examples": [_VALUATION_EXAMPLE]})
+
+    current_price: Decimal
+    invested_value: Decimal = Field(description="Quantidade x preço médio.")
+    market_value: Decimal = Field(description="Quantidade x cotação atual.")
+
+
+class StockPerformanceOut(PositionValuationOut):
+    """Resultado de uma ação na carteira (consultarDesempenhoAcao)."""
+
+    model_config = ConfigDict(json_schema_extra={"examples": [_PERFORMANCE_EXAMPLE]})
+
+    gain: Decimal = Field(description="Ganho (positivo) ou perda (negativo) em reais.")
+    profitability_pct: Decimal | None = Field(
+        default=None, description="Rentabilidade em porcentagem; 12.50 = 12,5%."
+    )
+
+
+class PortfolioPerformanceOut(BaseModel):
+    """Desempenho consolidado da carteira (obterDesempenhoCarteira)."""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "portfolio_id": 1,
+                    "portfolio_name": "Dividendos",
+                    "total_invested": "3000.00",
+                    "total_market_value": "3300.00",
+                    "total_gain": "300.00",
+                    "profitability_pct": "10.00",
+                    "positions": [_PERFORMANCE_EXAMPLE],
+                }
+            ]
+        }
+    )
+
+    portfolio_id: int
+    portfolio_name: str
+    total_invested: Decimal
+    total_market_value: Decimal
+    total_gain: Decimal
+    profitability_pct: Decimal | None = Field(
+        default=None,
+        description="Calculada sobre os totais; nula quando não há valor investido.",
+    )
+    positions: list[StockPerformanceOut]
+
+
 class PortfolioCreate(BaseModel):
     portfolio_name: str = Field(min_length=1, max_length=100)
     description: str | None = Field(default=None, max_length=255)

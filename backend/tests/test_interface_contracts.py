@@ -15,6 +15,7 @@ from src.interfaces import (
     IIncomeService,
     IInvestmentService,
     IMarketDataService,
+    IPerformanceService,
     IPortfolioService,
     IReturnsService,
 )
@@ -22,6 +23,7 @@ from src.services.broker_service import BrokerService
 from src.services.income_service import IncomeService
 from src.services.investment_service import InvestmentService
 from src.services.market_data_service import BrapiMarketDataService
+from src.services.performance_service import PerformanceService
 from src.services.portfolio_service import PortfolioService
 from src.services.returns_service import ReturnsService
 
@@ -43,8 +45,9 @@ def _operations(protocol) -> list[str]:
         (IReturnsService, ReturnsService),
         (IBrokerService, BrokerService),
         (IIncomeService, IncomeService),
+        (IPerformanceService, PerformanceService),
     ],
-    ids=["Portfolio", "Investment", "MarketData", "Returns", "Broker", "Income"],
+    ids=["Portfolio", "Investment", "MarketData", "Returns", "Broker", "Income", "Performance"],
 )
 def test_implementacao_fornece_todas_as_operacoes_da_interface(protocol, implementation):
     for name in _operations(protocol):

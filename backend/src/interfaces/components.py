@@ -14,9 +14,12 @@ from ..db.schemas import (
     BrokerCreate,
     PortfolioCreate,
     PortfolioUpdate,
+    PortfolioPerformanceOut,
     PositionOut,
+    PositionValuationOut,
     ReturnPeriod,
     ReturnsOut,
+    StockPerformanceOut,
     StockTradeCreate,
     UserCreate,
 )
@@ -231,6 +234,43 @@ class IReturnsService(Protocol):
         do usuário (senão 404).
         Pós: ganho ou perda por ativo e total no período, com a série diária
         (vazia em "max") e os ativos sem cotação listados em `unavailable`."""
+        ...
+
+
+class IPerformanceService(Protocol):
+    """
+    Interface fornecida pelo Performance Component (Lab 7: Serviço de Desempenho).
+
+    Interfaces requeridas: IInvestmentService (posições do usuário),
+    IPortfolioService (dados da carteira) e IMarketDataService (cotações).
+    Consumidores previstos: Report Component e Frontend.
+    """
+
+    async def evaluate_positions(
+        self, user_id: int, portfolio_id: int
+    ) -> list[PositionValuationOut]:
+        """avaliarPosicoes. Pré: carteira do usuário (senão 404) e cotação de cada
+        ação disponível (senão 404). Pós: posições com cotação atual, valor
+        investido e valor de mercado; carteira sem posições retorna []."""
+        ...
+
+    async def get_stock_performance(
+        self, user_id: int, portfolio_id: int, stock_name: str
+    ) -> StockPerformanceOut:
+        """consultarDesempenhoAcao. Pré: carteira do usuário e ação presente nela
+        (senão 404). Pós: posição avaliada com ganho ou perda e rentabilidade."""
+        ...
+
+    async def get_portfolio_performance(
+        self, user_id: int, portfolio_id: int
+    ) -> PortfolioPerformanceOut:
+        """obterDesempenhoCarteira. Pré: carteira do usuário (senão 404).
+        Pós: totais, rentabilidade sobre os totais e detalhamento por ação."""
+        ...
+
+    async def recalculate(self, user_id: int) -> None:
+        """Acionada de forma assíncrona após compras e vendas. Pós: cotações das
+        posições renovadas; falhas são registradas e não afetam a operação."""
         ...
 
 

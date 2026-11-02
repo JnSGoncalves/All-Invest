@@ -7,6 +7,11 @@ Aplicação web para centralizar ações da B3. A pessoa cria uma conta, organiz
 > Documentos da entrega na raiz: [`Especificacao_Componentes.pdf`](Especificacao_Componentes.pdf),
 > [`Roteiro_Video.pdf`](Roteiro_Video.pdf) e [`Relatorio_Implementacao.pdf`](Relatorio_Implementacao.pdf).
 
+> **Lab 7 – Especificação e Implementação de Serviços.**
+> Serviço implementado: **Serviço de Desempenho da Carteira**, do Bounded Context *Desempenho da Carteira*.
+> Documentos da entrega na raiz: [`Especificacao_Implementacao_Servicos.pdf`](Especificacao_Implementacao_Servicos.pdf)
+> e [`Roteiro_Video_2.pdf`](Roteiro_Video_2.pdf). Evidências em [`docs/evidencias/lab7/`](docs/evidencias/lab7/).
+
 **Equipe:** Danilo Henrique de Paulo · Jônatas da Silva Gonçalves · Kaynã de Deus Ferreira da Silva · Pedro Henrique da Fonseca do Nascimento · Vinícius do Nascimento Generoso · Wallace dos Santos Izidoro
 
 ## Tecnologias utilizadas
@@ -15,7 +20,7 @@ Aplicação web para centralizar ações da B3. A pessoa cria uma conta, organiz
 |---|---|
 | Backend (componentes) | Python 3.12, FastAPI 0.141, Pydantic 2, SQLAlchemy 2.0 |
 | Banco de dados | PostgreSQL (Supabase); SQLite em memória nos testes |
-| Integração externa | brapi.dev (validação de ticker e cotação, via Market Data Component) |
+| Integração externa | brapi.dev (validação de ticker, cotação e histórico, via Market Data Component) |
 | Testes | pytest 9, plugin anyio (testes assíncronos), `TestClient` do FastAPI |
 | Frontend | React, TypeScript e Vite |
 | Infraestrutura | Docker Compose, Nginx, GitHub Actions |
@@ -100,6 +105,23 @@ Catálogo **global** de corretoras, compartilhado por todos os usuários, mais o
 
 Todas as rotas exigem `X-API-Key` e `Authorization: Bearer <access_token>`. Uma carteira de outro usuário é tratada como inexistente (404).
 
+### `IPerformanceService` (Serviço de Desempenho da Carteira, Lab 7)
+
+Apura o resultado dos investimentos a preço de mercado. Requer `IInvestmentService` (posições), `IPortfolioService` (carteira) e `IMarketDataService` (cotações). Os consumidores previstos são o Report Component e o Frontend; o teste das operações é feito pelo Swagger UI.
+
+| Operação | Método | Endpoint |
+|---|---|---|
+| avaliarPosicoes() | `evaluate_positions(user_id, portfolio_id)` | `GET /api/performance/portfolios/{portfolio_id}/positions` |
+| consultarDesempenhoAcao() | `get_stock_performance(user_id, portfolio_id, stock_name)` | `GET /api/performance/portfolios/{portfolio_id}/positions/{stock_name}` |
+| obterDesempenhoCarteira() | `get_portfolio_performance(user_id, portfolio_id)` | `GET /api/performance/portfolios/{portfolio_id}` |
+| Recálculo assíncrono | `recalculate(user_id)` | Acionado por `POST /api/stocks` em `BackgroundTasks` |
+
+Respostas de erro: **401** (autenticação ou chave de API inválida), **404** (carteira inexistente ou de outro usuário, cotação não encontrada ou ação fora da carteira), **422** (`portfolio_id` inválido) e **504** (tempo de consulta excedido). Carteira sem posições retorna `[]`. As demais falhas do provedor de cotações (429, 502 e 503) são repassadas como o Market Data as define.
+
+A consulta é síncrona (REST com JSON). Depois de uma compra ou venda, `POST /api/stocks` responde sem esperar e agenda o recálculo, que renova as cotações das posições. As cotações ficam 60 segundos em cache, para que consultas em sequência usem o mesmo preço e não gastem o limite da brapi; as posições são sempre lidas na hora, então qualquer mudança na carteira aparece na consulta seguinte.
+
+Valores monetários saem como texto (`"3000.00"`), como nas demais rotas da API, para não perder precisão.
+
 ## Como ocorre a comunicação entre os componentes
 
 1. A comunicação acontece **dentro do mesmo processo, por interface**: o `InvestmentService` recebe no construtor um objeto do tipo `IPortfolioService` e não importa `PortfolioService`.
@@ -131,9 +153,10 @@ Os testes ficam em [`backend/tests/`](backend/tests/). Eles usam SQLite em memó
 | `test_investment_component.py` | Unitário (Investment com stub de `IPortfolioService`) | Registrar compra/venda; cotação automática; ticker inválido (404); corretora inválida (400); venda acima do saldo (422); preço médio; filtro por carteira; associar e remover investimento; chamadas feitas à interface do Portfolio |
 | `test_integration_investment_portfolio.py` | Integração (componentes reais) | Operação com carteira associa o ativo; mover ativo entre carteiras; posições por carteira; remover carteira preserva as operações; remover investimento desfaz a associação; carteira de outro usuário é recusada |
 | `test_api_integration.py` | Integração ponta a ponta (HTTP) | Fluxo pelas rotas: criar carteira, registrar compra com carteira, consultar por carteira, mover, editar e remover; erros 404, 409, 422 e API key inválida (401) |
+| `test_performance_component.py` | Integração ponta a ponta (HTTP) | Contrato do Serviço de Desempenho: campos de `avaliarPosicoes`; carteira vazia; ganho, perda e rentabilidade sobre os totais; erros 401, 404, 422 e 504; cache de cotações e recálculo assíncrono |
 | `test_interface_contracts.py` | Contrato | As implementações expõem todas as operações das interfaces, com a mesma assinatura e o mesmo modo (síncrono/assíncrono); o Investment requer `IPortfolioService` |
 
-Resultado atual: **45 testes aprovados**. A saída completa está em [`docs/evidencias/resultado_testes.txt`](docs/evidencias/resultado_testes.txt), com versão JUnit XML no mesmo diretório. O workflow [`tests.yml`](.github/workflows/tests.yml) executa os testes a cada push.
+Resultado atual: **129 testes aprovados**. A saída completa está em [`docs/evidencias/lab7/resultado_testes.txt`](docs/evidencias/lab7/resultado_testes.txt), ao lado da execução real da API e das capturas do Swagger UI. A saída do Lab 4 continua em [`docs/evidencias/resultado_testes.txt`](docs/evidencias/resultado_testes.txt). O workflow [`tests.yml`](.github/workflows/tests.yml) executa os testes a cada push.
 
 ### Executar os testes
 
@@ -144,6 +167,7 @@ pip install -r requirements-dev.txt
 python -m pytest -v                                      # todos
 python -m pytest tests/test_portfolio_component.py -v    # somente o Portfolio
 python -m pytest tests/test_investment_component.py -v   # somente o Investment
+python -m pytest tests/test_performance_component.py -v  # somente o Serviço de Desempenho
 python -m pytest tests/test_integration_investment_portfolio.py tests/test_api_integration.py -v   # integração
 ```
 
