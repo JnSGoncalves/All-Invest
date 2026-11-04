@@ -6,22 +6,20 @@ test('navega pelas posições mantendo o resumo da carteira', async ({ page }) =
     access_token: 'test-access', refresh_token: 'test-refresh', expires_in: 3600,
     user: { user_id: 1, name: 'Investidora Teste', email: 'teste@example.com' },
   } }));
-  await page.route('**/api/stocks/carteira/paginada?*', route => {
-    const current = Number(new URL(route.request().url()).searchParams.get('page'));
-    return route.fulfill({ json: {
-      results: [{ stock_name: current === 1 ? 'PETR4' : 'VALE3', company_name: 'Empresa', stock_quantity: 10, preco_medio: 20 }],
-      page: current, total_pages: 2, total_items: 11, total_quantity: 110, total_invested: 2200,
-    } });
-  });
+  // A lista vem ordenada por valor aplicado: PETR4 abre a página 1 e VALE3 fica sozinha na 2.
+  const tickers = ['PETR4', ...Array.from({ length: 9 }, (_, index) => `ATIV${index + 1}`), 'VALE3'];
+  await page.route('**/api/stocks/carteira', route => route.fulfill({ json: tickers.map((stock_name, index) => ({
+    stock_name, company_name: 'Empresa', stock_quantity: 10, preco_medio: 30 - index, portfolio_id: null, portfolio_name: null,
+  })) }));
   await page.goto('/');
-  await expect(page.getByRole('cell', { name: 'P PETR4 Empresa', exact: true })).toBeVisible();
+  await expect(page.getByRole('cell', { name: 'PE PETR4 Empresa', exact: true })).toBeVisible();
   const summary = page.getByRole('region', { name: 'Resumo da carteira' });
   const before = await summary.innerText();
   await expect(page.getByRole('button', { name: 'Anterior' })).toBeDisabled();
   await page.getByRole('button', { name: 'Próxima' }).click();
-  await expect(page.getByRole('cell', { name: 'V VALE3 Empresa', exact: true })).toBeVisible();
+  await expect(page.getByRole('cell', { name: 'VA VALE3 Empresa', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Próxima' })).toBeDisabled();
   expect(await summary.innerText()).toBe(before);
   await page.getByRole('button', { name: 'Anterior' }).click();
-  await expect(page.getByRole('cell', { name: 'P PETR4 Empresa', exact: true })).toBeVisible();
+  await expect(page.getByRole('cell', { name: 'PE PETR4 Empresa', exact: true })).toBeVisible();
 });

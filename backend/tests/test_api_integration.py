@@ -7,30 +7,14 @@ substituídos; a ligação entre os componentes é a mesma da produção
 (dependencies/components.py).
 """
 
+from datetime import datetime, timedelta, timezone
+from decimal import Decimal
+
 import pytest
-from fastapi.testclient import TestClient
 
 from src import main, models
-from src.db.database import get_db
 from src.dependencies.auth import get_current_user
 from src.dependencies.components import get_market_data_service
-
-API_KEY = "chave-de-teste"
-
-
-@pytest.fixture
-def client(monkeypatch, db, user, market_data):
-    monkeypatch.setattr(main, "validate_api_key", lambda _db, key: key == API_KEY)
-    monkeypatch.setattr(main, "SessionLocal", lambda: db)
-    monkeypatch.setattr(db, "close", lambda: None)
-
-    main.app.dependency_overrides[get_db] = lambda: db
-    main.app.dependency_overrides[get_current_user] = lambda: user
-    main.app.dependency_overrides[get_market_data_service] = lambda: market_data
-
-    with TestClient(main.app, headers={"X-API-Key": API_KEY}) as test_client:
-        yield test_client
-    main.app.dependency_overrides.clear()
 
 
 def test_fluxo_completo_carteira_e_investimento(client):
@@ -131,18 +115,60 @@ def test_rotas_de_carteira_exigem_api_key(client):
     assert response.status_code == 401
 
 
+def test_rendimento_sem_ativos_informa_carteira_vazia(client):
+    response = client.get("/api/rendimentos", params={"periodo": "1mo"})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["has_assets"] is False
+    assert body["assets"] == [] and body["series"] == []
+
+
+def test_rendimento_cruza_operacoes_com_historico(client, market_data):
+    today = datetime.now(timezone(timedelta(hours=-3))).date()
+    market_data.histories["PETR4"] = [
+        (today - timedelta(days=40), Decimal("29")),
+        (today, Decimal("33")),
+    ]
+    client.post(
+        "/api/stocks",
+        json={"stock_name": "PETR4", "stock_quantity": 10, "stock_price": "30", "broker_id": 1, "trade_side": "BUY"},
+    )
+
+    response = client.get("/api/rendimentos", params={"periodo": "1mo"})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["has_assets"] is True
+    assert Decimal(body["bought"]) == Decimal("300")
+    assert Decimal(body["end_value"]) == Decimal("330")
+    assert Decimal(body["gain"]) == Decimal("30")
+    assert body["assets"][0]["stock_name"] == "PETR4"
+    assert Decimal(body["series"][-1]["gain"]) == Decimal("30")
+
+
+def test_rendimento_rejeita_periodo_invalido(client):
+    assert client.get("/api/rendimentos", params={"periodo": "10y"}).status_code == 422
+
+
+def test_rendimento_exige_usuario_autenticado(client):
+    del main.app.dependency_overrides[get_current_user]
+
+    response = client.get("/api/rendimentos")
+
+    assert response.status_code == 401
+
+
 def test_listar_corretoras_somente_do_usuario(client, db, user, other_user):
     db.add_all([
-        models.Broker(broker_id=101, broker_name="XP Investimentos"),
-        models.Broker(broker_id=102, broker_name="Clear"),
         models.Broker(broker_id=103, broker_name="Outra corretora"),
         models.Broker(broker_id=104, broker_name="Sem vínculo"),
     ])
     db.flush()
     db.add_all([
-        models.UserBroker(user_id=user.user_id, broker_id=101),
-        models.UserBroker(user_id=user.user_id, broker_id=102),
-        models.UserBroker(user_id=other_user.user_id, broker_id=102),
+        models.UserBroker(user_id=user.user_id, broker_id=1),
+        models.UserBroker(user_id=user.user_id, broker_id=3),
+        models.UserBroker(user_id=other_user.user_id, broker_id=3),
         models.UserBroker(user_id=other_user.user_id, broker_id=103),
     ])
     db.commit()
@@ -151,15 +177,13 @@ def test_listar_corretoras_somente_do_usuario(client, db, user, other_user):
 
     assert response.status_code == 200
     assert response.json() == [
-        {"broker_id": 102, "broker_name": "Clear"},
-        {"broker_id": 101, "broker_name": "XP Investimentos"},
+        {"broker_id": 3, "broker_name": "Clear"},
+        {"broker_id": 1, "broker_name": "XP Investimentos"},
     ]
 
 
 def test_listar_corretoras_sem_vinculos_retorna_lista_vazia(client, db, other_user):
-    db.add(models.Broker(broker_id=101, broker_name="XP Investimentos"))
-    db.flush()
-    db.add(models.UserBroker(user_id=other_user.user_id, broker_id=101))
+    db.add(models.UserBroker(user_id=other_user.user_id, broker_id=1))
     db.commit()
 
     response = client.get("/api/brokers")
@@ -187,6 +211,39 @@ def test_listar_corretoras_exige_api_key(client, api_key):
     response = client.get("/api/brokers", headers=headers)
 
     assert response.status_code == 401
+
+
+def test_cadastrar_corretora_e_registrar_operacao_por_ela(client):
+    response = client.post("/api/brokers", json={"broker_name": "BTG Pactual"})
+    assert response.status_code == 201, response.text
+    broker = response.json()
+
+    assert broker["broker_name"] in [item["broker_name"] for item in client.get("/api/brokers").json()]
+    assert client.post("/api/brokers", json={"broker_name": "btg pactual"}).status_code == 409
+
+    response = client.post(
+        "/api/stocks",
+        json={"stock_name": "ITUB4", "stock_quantity": 3, "stock_price": "35", "broker_id": broker["broker_id"], "trade_side": "BUY"},
+    )
+    assert response.status_code == 201, response.text
+    assert response.json()["broker_id"] == broker["broker_id"]
+    assert response.json()["broker_name"] == "BTG Pactual"
+
+    # Em uso por uma operação, a corretora não pode ser removida.
+    assert client.delete(f"/api/brokers/{broker['broker_id']}").status_code == 409
+
+
+def test_remover_corretora_sem_operacoes(client):
+    broker_id = client.post("/api/brokers", json={"broker_name": "Genial"}).json()["broker_id"]
+
+    assert client.delete(f"/api/brokers/{broker_id}").status_code == 200
+    assert broker_id not in [item["broker_id"] for item in client.get("/api/brokers").json()]
+
+
+def test_corretoras_exigem_usuario_autenticado(client):
+    del main.app.dependency_overrides[get_current_user]
+
+    assert client.get("/api/brokers").status_code == 401
 
 
 def _trade(client, **changes):

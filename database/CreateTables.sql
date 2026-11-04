@@ -79,6 +79,7 @@ CREATE INDEX ix_refresh_tokens_user_id ON refresh_tokens(user_id);
 CREATE INDEX ix_refresh_tokens_token_hash ON refresh_tokens(token_hash);
 CREATE INDEX ix_stocks_stock_id ON stocks(stock_id);
 CREATE INDEX ix_brokers_broker_id ON brokers(broker_id);
+CREATE UNIQUE INDEX uq_brokers_name_lower ON brokers(LOWER(broker_name));
 CREATE INDEX ix_users_stocks_user_id ON users_stocks(user_id);
 CREATE INDEX ix_users_stocks_stock_id ON users_stocks(stock_id);
 CREATE INDEX ix_users_brokers_user_id ON users_brokers(user_id);
@@ -95,3 +96,6 @@ CREATE TABLE IF NOT EXISTS investment_incomes (
     kind VARCHAR(20) NOT NULL CONSTRAINT chk_income_kind CHECK (kind IN ('DIVIDEND', 'JCP', 'OTHER'))
 );
 CREATE INDEX IF NOT EXISTS ix_investment_incomes_user_id ON investment_incomes(user_id);
+
+-- Catálogo inicial de corretoras (Broker Component).
+INSERT INTO brokers (broker_name) VALUES ('XP Investimentos'), ('Rico'), ('Clear'), ('NuInvest');

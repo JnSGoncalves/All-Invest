@@ -5,22 +5,27 @@ from sqlalchemy.orm import Session
 
 from ..interfaces import (
     IAuthService,
+    IBrokerService,
     IGoogleOAuthService,
+    IIncomeService,
     IInvestmentService,
     IMarketDataService,
+    IPerformanceService,
     IPortfolioService,
+    IReturnsService,
     IUserService,
 )
 from ..db.database import get_db
 from ..services.auth_service import AuthService
+from ..services.broker_service import BrokerService
 from ..services.google.oauth_service import GoogleOAuthService
+from ..services.income_service import IncomeService
 from ..services.investment_service import InvestmentService
 from ..services.market_data_service import BrapiMarketDataService
+from ..services.performance_service import PerformanceService
 from ..services.portfolio_service import PortfolioService
+from ..services.returns_service import ReturnsService
 from ..services.user_service import UserService
-from ..interfaces.components import IBrokerService, IIncomeService
-from ..services.broker_service import BrokerService
-from ..services.income_service import IncomeService
 
 
 def get_user_service(db: Session = Depends(get_db)) -> IUserService:
@@ -46,6 +51,10 @@ def get_portfolio_service(db: Session = Depends(get_db)) -> IPortfolioService:
     return PortfolioService(db)
 
 
+def get_broker_service(db: Session = Depends(get_db)) -> IBrokerService:
+    return BrokerService(db)
+
+
 def get_investment_service(
     db: Session = Depends(get_db),
     market_data: IMarketDataService = Depends(get_market_data_service),
@@ -55,8 +64,20 @@ def get_investment_service(
     return InvestmentService(db, market_data, portfolios)
 
 
-def get_broker_service(db: Session = Depends(get_db)) -> IBrokerService:
-    return BrokerService(db)
+def get_returns_service(
+    investments: IInvestmentService = Depends(get_investment_service),
+    portfolios: IPortfolioService = Depends(get_portfolio_service),
+    market_data: IMarketDataService = Depends(get_market_data_service),
+) -> IReturnsService:
+    return ReturnsService(investments, portfolios, market_data)
+
+
+def get_performance_service(
+    investments: IInvestmentService = Depends(get_investment_service),
+    portfolios: IPortfolioService = Depends(get_portfolio_service),
+    market_data: IMarketDataService = Depends(get_market_data_service),
+) -> IPerformanceService:
+    return PerformanceService(investments, portfolios, market_data)
 
 
 def get_income_service(db: Session = Depends(get_db)) -> IIncomeService:

@@ -5,12 +5,16 @@ Integração com a brapi.dev para:
   - validar se um ticker existe e está ativo na B3 antes do cadastro
   - listar os tickers disponíveis (screener simples)
   - fornecer sugestões de autocomplete para o front
+  - buscar cotações históricas por ativo e período (HU08), com cache
 
-Endpoint utilizado: GET {BRAPI_URL}/tickers
-Docs: https://brapi.dev/docs/tickers
+Endpoints utilizados: GET {BRAPI_URL}/tickers, /stocks/quote e /stocks/historical
+Docs: https://brapi.dev/docs/tickers e https://brapi.dev/docs/acoes/historico
 """
 
+import asyncio
 import os
+import time
+from datetime import date, datetime, timezone
 from decimal import Decimal
 from typing import Optional
 
@@ -20,6 +24,24 @@ from fastapi import HTTPException, status
 BRAPI_URL = os.getenv("BRAPI_URL", "https://brapi.dev/api/v2")
 BRAPI_TOKEN = os.getenv("BRAPI_TOKEN")
 _TIMEOUT = httpx.Timeout(10.0, connect=5.0)
+_MAX_RETRY_WAIT_SECONDS = 3.0
+
+# Cache em memória do histórico: (ticker, início, fim) -> (expira_em, pontos).
+# Séries que terminam hoje ainda mudam no pregão, por isso expiram rápido;
+# janelas já encerradas não mudam e podem ficar mais tempo.
+_HISTORY_CACHE: dict[tuple[str, date, date], tuple[float, tuple[tuple[date, Decimal], ...]]] = {}
+_HISTORY_TTL_SECONDS = int(os.getenv("BRAPI_HISTORY_CACHE_SECONDS", "900"))
+_HISTORY_CLOSED_TTL_SECONDS = 12 * 60 * 60
+_HISTORY_CACHE_MAX_ITEMS = 1000
+
+
+def _retry_after_seconds(response: httpx.Response) -> float | None:
+    """Espera sugerida pelo 429, se for curta o bastante para a requisição aguardar."""
+    try:
+        wait = float(response.headers.get("Retry-After", "1"))
+    except ValueError:
+        return None
+    return wait if 0 <= wait <= _MAX_RETRY_WAIT_SECONDS else None
 
 
 async def _get(path: str, params: dict) -> dict:
@@ -38,6 +60,16 @@ async def _get(path: str, params: dict) -> dict:
                 headers={"Authorization": f"Bearer {BRAPI_TOKEN}"},
                 params=params,
             )
+            if response.status_code == status.HTTP_429_TOO_MANY_REQUESTS:
+                # Limite curto de frequência: espera o tempo indicado e tenta uma vez mais.
+                wait = _retry_after_seconds(response)
+                if wait is not None:
+                    await asyncio.sleep(wait)
+                    response = await client.get(
+                        url,
+                        headers={"Authorization": f"Bearer {BRAPI_TOKEN}"},
+                        params=params,
+                    )
     except httpx.TimeoutException:
         raise HTTPException(
             status_code=status.HTTP_504_GATEWAY_TIMEOUT,
@@ -63,6 +95,24 @@ async def _get(path: str, params: dict) -> dict:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail="Erro no serviço da brapi.dev.",
+        )
+    if response.status_code in (
+        status.HTTP_400_BAD_REQUEST,
+        status.HTTP_403_FORBIDDEN,
+        status.HTTP_404_NOT_FOUND,
+    ):
+        # A brapi explica o motivo (ticker inexistente, limite do plano) em `message`.
+        try:
+            message = response.json().get("message")
+        except ValueError:
+            message = None
+        raise HTTPException(
+            status_code=(
+                status.HTTP_404_NOT_FOUND
+                if response.status_code == status.HTTP_404_NOT_FOUND
+                else status.HTTP_502_BAD_GATEWAY
+            ),
+            detail=message or "A brapi.dev recusou a consulta.",
         )
 
     response.raise_for_status()
@@ -144,6 +194,68 @@ async def obter_cotacao(stock_name: str) -> Decimal:
     return Decimal(str(preco))
 
 
+async def obter_historico(
+    stock_name: str, inicio: date, fim: date
+) -> list[tuple[date, Decimal]]:
+    """
+    Busca os fechamentos diários de um ticker entre `inicio` e `fim`.
+
+    Retorna pares (data do pregão, preço de fechamento) em ordem crescente.
+    Usa `close` (e não `adjustedClose`) para comparar com os preços que o
+    usuário realmente pagou nas operações registradas.
+
+    O plano gratuito da brapi aceita um ativo por requisição e janelas de
+    até 90 dias; o cache evita repetir a mesma consulta a cada tela aberta.
+    """
+    ticker = stock_name.strip().upper()
+    key = (ticker, inicio, fim)
+    agora = time.monotonic()
+
+    cached = _HISTORY_CACHE.get(key)
+    if cached and cached[0] > agora:
+        return list(cached[1])
+
+    data = await _get(
+        "/stocks/historical",
+        {
+            "symbols": ticker,
+            "startDate": inicio.isoformat(),
+            "endDate": fim.isoformat(),
+            "interval": "1d",
+        },
+    )
+
+    resultados = data.get("results") or []
+    precos = (resultados[0].get("data") or {}).get("historicalDataPrice") if resultados else None
+    if not precos:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Histórico de cotações não encontrado para '{ticker}'.",
+        )
+
+    pontos = sorted(
+        {
+            # O pregão vem como meia-noite de Brasília (03:00 UTC): a data UTC é o dia certo.
+            datetime.fromtimestamp(item["date"], timezone.utc).date(): Decimal(str(item["close"]))
+            for item in precos
+            if item.get("date") is not None and item.get("close") is not None
+        }.items()
+    )
+
+    ttl = (
+        _HISTORY_TTL_SECONDS
+        if fim >= datetime.now(timezone.utc).date()
+        else _HISTORY_CLOSED_TTL_SECONDS
+    )
+    for chave in [k for k, (expira, _) in _HISTORY_CACHE.items() if expira <= agora]:
+        del _HISTORY_CACHE[chave]
+    while len(_HISTORY_CACHE) >= _HISTORY_CACHE_MAX_ITEMS:
+        del _HISTORY_CACHE[next(iter(_HISTORY_CACHE))]
+    _HISTORY_CACHE[key] = (agora + ttl, tuple(pontos))
+
+    return pontos
+
+
 async def listar_tickers(
     search: Optional[str] = None,
     tipo: Optional[str] = None,
@@ -206,6 +318,11 @@ class BrapiMarketDataService:
 
     async def get_quote(self, stock_name: str) -> Decimal:
         return await obter_cotacao(stock_name)
+
+    async def get_price_history(
+        self, stock_name: str, start: date, end: date
+    ) -> list[tuple[date, Decimal]]:
+        return await obter_historico(stock_name, start, end)
 
     async def list_tickers(
         self,

@@ -7,7 +7,9 @@ from .components import (
     IGoogleOAuthService,
     IInvestmentService,
     IMarketDataService,
+    IPerformanceService,
     IPortfolioService,
+    IReturnsService,
     IUserService,
 )
 
@@ -18,6 +20,8 @@ __all__ = [
     "IGoogleOAuthService",
     "IInvestmentService",
     "IMarketDataService",
+    "IPerformanceService",
     "IPortfolioService",
+    "IReturnsService",
     "IUserService",
 ]
