@@ -9,6 +9,7 @@ from .components import (
     IMarketDataService,
     IPerformanceService,
     IPortfolioService,
+    IReportService,
     IReturnsService,
     IUserService,
 )
@@ -22,6 +23,7 @@ __all__ = [
     "IMarketDataService",
     "IPerformanceService",
     "IPortfolioService",
+    "IReportService",
     "IReturnsService",
     "IUserService",
 ]

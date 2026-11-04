@@ -12,6 +12,8 @@ interface HoldingsPanelProps {
   loadError: string | null;
   highlight: string | null;
   movingTicker: string | null;
+  exporting: boolean;
+  onExport: () => void;
   onFilterChange: (filter: PortfolioFilter) => void;
   onRetry: () => void;
   onBuy: (ticker: string, portfolioId?: number | null) => void;
@@ -41,7 +43,7 @@ function matchesFilter(position: Position, filter: PortfolioFilter): boolean {
 }
 
 export default function HoldingsPanel(props: HoldingsPanelProps) {
-  const { positions, portfolios, filter, loading, loadError, highlight, movingTicker } = props;
+  const { positions, portfolios, filter, loading, loadError, highlight, movingTicker, exporting } = props;
   const hasPortfolios = Boolean(portfolios && portfolios.length > 0);
   const ranked = [...positions].sort((a, b) => valueOf(b) - valueOf(a));
   const colorByTicker = new Map(positions.slice(0, SERIES_COLORS.length).map((position, index) => [position.stock_name, SERIES_COLORS[index]]));
@@ -82,9 +84,20 @@ export default function HoldingsPanel(props: HoldingsPanelProps) {
           <span className="eyebrow">ACOMPANHAMENTO</span>
           <h2 id="holdings-title">Minha carteira</h2>
         </div>
-        <button type="button" className="ghost-button" onClick={() => props.onBuy("")}>
-          <Icon name="plus" size={16} /> Registrar compra
-        </button>
+        <div className="panel-actions">
+          <button
+            type="button"
+            className="ghost-button"
+            onClick={props.onExport}
+            disabled={exporting}
+            title={activePortfolio ? `Exportar a carteira “${activePortfolio.portfolio_name}”` : "Exportar todas as posições"}
+          >
+            <Icon name="download" size={16} /> {exporting ? "Gerando…" : "Exportar Excel"}
+          </button>
+          <button type="button" className="ghost-button" onClick={() => props.onBuy("")}>
+            <Icon name="plus" size={16} /> Registrar compra
+          </button>
+        </div>
       </div>
 
       {portfolios && (

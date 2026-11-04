@@ -9,8 +9,8 @@ Aplicação web para centralizar ações da B3. A pessoa cria uma conta, organiz
 
 > **Lab 7 – Especificação e Implementação de Serviços.**
 > Serviço implementado: **Serviço de Desempenho da Carteira**, do Bounded Context *Desempenho da Carteira*.
-> Documentos da entrega na raiz: [`Especificacao_Implementacao_Servicos.pdf`](Especificacao_Implementacao_Servicos.pdf)
-> e [`Roteiro_Video_2.pdf`](Roteiro_Video_2.pdf). Evidências em [`docs/evidencias/lab7/`](docs/evidencias/lab7/).
+> Documentos da entrega na raiz: [`Especificacao_Implementacao_Servicos.pdf`](docs/Especificacao_Implementacao_Servicos.pdf)
+> e [`Roteiro_Video_2.pdf`](docs/Roteiro_Video_2.pdf). Evidências em [`docs/evidencias/lab7/`](docs/evidencias/lab7/).
 
 **Equipe:** Danilo Henrique de Paulo · Jônatas da Silva Gonçalves · Kaynã de Deus Ferreira da Silva · Pedro Henrique da Fonseca do Nascimento · Vinícius do Nascimento Generoso · Wallace dos Santos Izidoro
 
@@ -107,7 +107,7 @@ Todas as rotas exigem `X-API-Key` e `Authorization: Bearer <access_token>`. Uma 
 
 ### `IPerformanceService` (Serviço de Desempenho da Carteira, Lab 7)
 
-Apura o resultado dos investimentos a preço de mercado. Requer `IInvestmentService` (posições), `IPortfolioService` (carteira) e `IMarketDataService` (cotações). Os consumidores previstos são o Report Component e o Frontend; o teste das operações é feito pelo Swagger UI.
+Apura o resultado dos investimentos a preço de mercado. Requer `IInvestmentService` (posições), `IPortfolioService` (carteira) e `IMarketDataService` (cotações). O Report Component já consome o serviço na exportação em Excel; o Frontend é consumidor previsto.
 
 | Operação | Método | Endpoint |
 |---|---|---|
@@ -121,6 +121,24 @@ Respostas de erro: **401** (autenticação ou chave de API inválida), **404** (
 A consulta é síncrona (REST com JSON). Depois de uma compra ou venda, `POST /api/stocks` responde sem esperar e agenda o recálculo, que renova as cotações das posições. As cotações ficam 60 segundos em cache, para que consultas em sequência usem o mesmo preço e não gastem o limite da brapi; as posições são sempre lidas na hora, então qualquer mudança na carteira aparece na consulta seguinte.
 
 Valores monetários saem como texto (`"3000.00"`), como nas demais rotas da API, para não perder precisão.
+
+### `IReportService` (Report Component)
+
+Exporta a carteira em Excel. Requer `IPerformanceService` (valores e valorização), `IInvestmentService` (movimentações), `IIncomeService` (proventos) e `IPortfolioService` (carteiras).
+
+| Operação | Método | Endpoint |
+|---|---|---|
+| exportarPlanilha() | `export_workbook(user_id, portfolio_id=None)` | `GET /api/reports/export?portfolio_id=` |
+
+Sem `portfolio_id`, a planilha traz todas as posições, inclusive as sem carteira. O arquivo `.xlsx` tem as abas:
+
+- **Resumo:** totais, valorização, proventos e o que não está incluído no cálculo.
+- **Posições:** uma linha por ação, com situação `Aberta`, `Encerrada` ou `Sem cotação`, e link para a aba da ação.
+- **Uma aba por ação:** movimentações com saldo e preço médio depois de cada operação, e proventos. Ações vendidas por inteiro também têm aba.
+
+Respostas de erro: **401** (autenticação ou chave de API inválida), **404** (carteira inexistente ou de outro usuário) e **422** (`portfolio_id` inválido). Uma cotação indisponível não impede a exportação: a ação fica marcada como `Sem cotação` e sai dos totais.
+
+A valorização é calculada sobre as posições abertas e não inclui lucro de vendas realizadas, bonificações não lançadas, impostos e taxas.
 
 ## Como ocorre a comunicação entre os componentes
 
@@ -154,9 +172,10 @@ Os testes ficam em [`backend/tests/`](backend/tests/). Eles usam SQLite em memó
 | `test_integration_investment_portfolio.py` | Integração (componentes reais) | Operação com carteira associa o ativo; mover ativo entre carteiras; posições por carteira; remover carteira preserva as operações; remover investimento desfaz a associação; carteira de outro usuário é recusada |
 | `test_api_integration.py` | Integração ponta a ponta (HTTP) | Fluxo pelas rotas: criar carteira, registrar compra com carteira, consultar por carteira, mover, editar e remover; erros 404, 409, 422 e API key inválida (401) |
 | `test_performance_component.py` | Integração ponta a ponta (HTTP) | Contrato do Serviço de Desempenho: campos de `avaliarPosicoes`; carteira vazia; ganho, perda e rentabilidade sobre os totais; erros 401, 404, 422 e 504; cache de cotações e recálculo assíncrono |
+| `test_report_component.py` | Integração ponta a ponta (HTTP) | Conteúdo da planilha: abas, valores iguais aos da API de desempenho, saldo e preço médio por operação, ações encerradas e sem cotação, proventos, proteção contra fórmulas e isolamento entre usuários |
 | `test_interface_contracts.py` | Contrato | As implementações expõem todas as operações das interfaces, com a mesma assinatura e o mesmo modo (síncrono/assíncrono); o Investment requer `IPortfolioService` |
 
-Resultado atual: **129 testes aprovados**. A saída completa está em [`docs/evidencias/lab7/resultado_testes.txt`](docs/evidencias/lab7/resultado_testes.txt), ao lado da execução real da API e das capturas do Swagger UI. A saída do Lab 4 continua em [`docs/evidencias/resultado_testes.txt`](docs/evidencias/resultado_testes.txt). O workflow [`tests.yml`](.github/workflows/tests.yml) executa os testes a cada push.
+Resultado atual: **154 testes aprovados**. A saída da entrega do Lab 7 (129 testes) está em [`docs/evidencias/lab7/resultado_testes.txt`](docs/evidencias/lab7/resultado_testes.txt), ao lado da execução real da API e das capturas do Swagger UI. A saída do Lab 4 continua em [`docs/evidencias/resultado_testes.txt`](docs/evidencias/resultado_testes.txt). O workflow [`tests.yml`](.github/workflows/tests.yml) executa os testes a cada push.
 
 ### Executar os testes
 
@@ -168,6 +187,7 @@ python -m pytest -v                                      # todos
 python -m pytest tests/test_portfolio_component.py -v    # somente o Portfolio
 python -m pytest tests/test_investment_component.py -v   # somente o Investment
 python -m pytest tests/test_performance_component.py -v  # somente o Serviço de Desempenho
+python -m pytest tests/test_report_component.py -v       # somente a exportação em Excel
 python -m pytest tests/test_integration_investment_portfolio.py tests/test_api_integration.py -v   # integração
 ```
 

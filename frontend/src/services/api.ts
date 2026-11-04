@@ -322,6 +322,22 @@ export interface Broker {
   broker_name: string;
 }
 
+export async function downloadPortfolioWorkbook(portfolioId: number | null): Promise<void> {
+  const query = portfolioId === null ? "" : `?portfolio_id=${portfolioId}`;
+  const response = await authenticatedFetch(`/api/reports/export${query}`);
+  if (!response.ok) throw await errorFromResponse(response);
+
+  // A rota exige cabeçalhos de autenticação, então um link direto não funcionaria.
+  const url = URL.createObjectURL(await response.blob());
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `all-invest-carteira-${new Date().toLocaleDateString("en-CA")}.xlsx`;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
 export async function getBrokers(): Promise<Broker[]> {
   const response = await authenticatedFetch("/api/brokers/catalogo");
   if (!response.ok) throw await errorFromResponse(response);

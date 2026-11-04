@@ -18,6 +18,7 @@ const paths = {
   trend: <><path d="m3.5 16.5 6-6 4 4 7-7.5"/><path d="M15.5 7h5v5"/></>,
   up: <><path d="M12 19V5M6 11l6-6 6 6"/></>,
   down: <><path d="M12 5v14M6 13l6 6 6-6"/></>,
+  download: <><path d="M12 4v11M7 11l5 5 5-5"/><path d="M4.5 20h15"/></>,
 };
 
 export type IconName = keyof typeof paths;

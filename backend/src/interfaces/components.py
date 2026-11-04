@@ -268,9 +268,33 @@ class IPerformanceService(Protocol):
         Pós: totais, rentabilidade sobre os totais e detalhamento por ação."""
         ...
 
+    async def evaluate_available(
+        self, user_id: int, portfolio_id: int | None = None
+    ) -> tuple[list[StockPerformanceOut], list[PositionOut]]:
+        """Avaliação tolerante a falhas de cotação, para relatórios. Pré: se
+        portfolio_id for informado, a carteira é do usuário (senão 404).
+        Pós: posições avaliadas e, à parte, as que ficaram sem cotação."""
+        ...
+
     async def recalculate(self, user_id: int) -> None:
         """Acionada de forma assíncrona após compras e vendas. Pós: cotações das
         posições renovadas; falhas são registradas e não afetam a operação."""
+        ...
+
+
+class IReportService(Protocol):
+    """
+    Interface fornecida pelo Report Component.
+
+    Interfaces requeridas: IPerformanceService (valores e valorização),
+    IInvestmentService (movimentações), IIncomeService (proventos) e
+    IPortfolioService (carteiras).
+    """
+
+    async def export_workbook(self, user_id: int, portfolio_id: int | None = None) -> bytes:
+        """exportarPlanilha. Pré: se portfolio_id for informado, a carteira é do
+        usuário (senão 404). Pós: arquivo .xlsx com Resumo, Posições e uma aba por
+        ação; ações sem cotação aparecem marcadas e ficam fora dos totais."""
         ...
 
 

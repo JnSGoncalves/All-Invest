@@ -11,6 +11,7 @@ cryptography==50.0.1
 detect-installer==0.2.1
 dnspython==2.8.0
 email-validator==2.3.0
+et_xmlfile==2.0.0
 fastapi==0.141.1
 fastapi-cli==0.0.32
 fastapi-cloud-cli==0.26.0
@@ -27,6 +28,7 @@ joserfc==1.7.5
 markdown-it-py==4.2.0
 MarkupSafe==3.0.3
 mdurl==0.1.2
+openpyxl==3.1.5
 psycopg2-binary==2.9.13
 pycparser==3.0
 pydantic==2.13.5

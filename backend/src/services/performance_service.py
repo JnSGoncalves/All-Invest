@@ -101,6 +101,26 @@ class PerformanceService:
             positions=positions,
         )
 
+    async def evaluate_available(
+        self, user_id: int, portfolio_id: int | None = None
+    ) -> tuple[list[schemas.StockPerformanceOut], list[schemas.PositionOut]]:
+        positions = self._investments.get_positions(user_id, portfolio_id)
+        priced = []
+        unavailable = list(positions)
+        try:
+            async with asyncio.timeout(QUOTES_TIMEOUT_SECONDS):
+                for position in positions:
+                    try:
+                        current_price = await self._quote(position.stock_name, refresh=False)
+                    except HTTPException:
+                        continue
+                    priced.append(self._performance(self._valuation(position, current_price)))
+                    unavailable.remove(position)
+        except TimeoutError:
+            # As posições ainda não avaliadas seguem em `unavailable`.
+            pass
+        return priced, unavailable
+
     async def recalculate(self, user_id: int) -> None:
         try:
             positions = self._investments.get_positions(user_id)
