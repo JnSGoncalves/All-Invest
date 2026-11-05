@@ -1,13 +1,15 @@
-from fastapi import APIRouter, Depends, status
+from datetime import datetime, timezone
+from decimal import Decimal
+from fastapi import APIRouter, BackgroundTasks, Depends, Query, status
 
 from ..db import schemas
 from ..dependencies.components import (
     get_investment_service,
     get_market_data_service,
+    get_performance_service,
 )
 from ..dependencies.auth import CurrentUser, get_current_user
-from ..interfaces import IInvestmentService, IMarketDataService
-from ..services.investment_catalog import BROKER_IDS_BY_NAME
+from ..interfaces import IInvestmentService, IMarketDataService, IPerformanceService
 
 router = APIRouter(
     prefix="/api/stocks",
@@ -22,14 +24,10 @@ def _trade_out(trade) -> dict:
         "company_name": trade.stock.company_name,
         "stock_quantity": trade.stock_quantity,
         "stock_price": trade.stock_price,
-        # O contrato público usa o ID provisório do catálogo mockado, e não
-        # a chave interna que o Supabase atribuiu à corretora.
-        "broker_id": BROKER_IDS_BY_NAME.get(
-            trade.broker.broker_name, trade.broker_id
-        ),
+        "broker_id": trade.broker_id,
         "broker_name": trade.broker.broker_name,
         "trade_side": trade.trade_side,
-        "trade_date": trade.trade_date,
+        "trade_date": trade.trade_date.replace(tzinfo=timezone.utc) if trade.trade_date.tzinfo is None else trade.trade_date,
     }
 
 
@@ -37,10 +35,13 @@ def _trade_out(trade) -> dict:
 async def cadastrar_operacao(
     trade_in: schemas.StockTradeCreate,
     current_user: CurrentUser,
+    background_tasks: BackgroundTasks,
     investment_service: IInvestmentService = Depends(get_investment_service),
+    performance: IPerformanceService = Depends(get_performance_service),
 ):
-    """Registra uma compra ou venda do usuário identificado pelo Bearer JWT."""
+    """Registra uma compra ou venda e aciona o recálculo do desempenho em segundo plano."""
     trade = await investment_service.create_trade(current_user.user_id, trade_in)
+    background_tasks.add_task(performance.recalculate, current_user.user_id)
     return _trade_out(trade)
 
 
@@ -75,6 +76,30 @@ def consultar_carteira(
 ):
     """Consolida quantidade e preço médio; `portfolio_id` filtra por carteira."""
     return investment_service.get_positions(current_user.user_id, portfolio_id)
+
+
+@router.get("/carteira/paginada", response_model=schemas.PositionPage)
+def listar_posicoes_paginadas(
+    current_user: CurrentUser,
+    page: int = Query(1, ge=1), limit: int = Query(10, ge=1, le=100),
+    investment_service: IInvestmentService = Depends(get_investment_service),
+):
+    positions = sorted(investment_service.get_positions(current_user.user_id), key=lambda p: p.stock_name)
+    return schemas.PositionPage(
+        results=positions[(page - 1) * limit:page * limit], page=page,
+        total_pages=max(1, (len(positions) + limit - 1) // limit), total_items=len(positions),
+        total_quantity=sum(p.stock_quantity for p in positions),
+        total_invested=sum((p.preco_medio * p.stock_quantity for p in positions), Decimal("0")),
+    )
+
+
+@router.patch("/{stock_name}/trades", response_model=schemas.StockTradeOut)
+def editar_movimentacao(
+    stock_name: str, trade_date: datetime, payload: schemas.TradeUpdate,
+    current_user: CurrentUser,
+    investment_service: IInvestmentService = Depends(get_investment_service),
+):
+    return _trade_out(investment_service.update_trade(current_user.user_id, stock_name, trade_date, payload))
 
 
 @router.put("/{stock_name}/portfolio", response_model=schemas.PositionOut)

@@ -79,9 +79,23 @@ CREATE INDEX ix_refresh_tokens_user_id ON refresh_tokens(user_id);
 CREATE INDEX ix_refresh_tokens_token_hash ON refresh_tokens(token_hash);
 CREATE INDEX ix_stocks_stock_id ON stocks(stock_id);
 CREATE INDEX ix_brokers_broker_id ON brokers(broker_id);
+CREATE UNIQUE INDEX uq_brokers_name_lower ON brokers(LOWER(broker_name));
 CREATE INDEX ix_users_stocks_user_id ON users_stocks(user_id);
 CREATE INDEX ix_users_stocks_stock_id ON users_stocks(stock_id);
 CREATE INDEX ix_users_brokers_user_id ON users_brokers(user_id);
 CREATE INDEX ix_portfolios_portfolio_id ON portfolios(portfolio_id);
 CREATE INDEX ix_portfolios_user_id ON portfolios(user_id);
 CREATE INDEX ix_portfolios_stocks_portfolio_id ON portfolios_stocks(portfolio_id);
+
+CREATE TABLE IF NOT EXISTS investment_incomes (
+    income_id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(user_id),
+    stock_name VARCHAR(20) NOT NULL,
+    amount NUMERIC(15,4) NOT NULL CONSTRAINT chk_income_amount CHECK (amount > 0),
+    received_at TIMESTAMPTZ NOT NULL,
+    kind VARCHAR(20) NOT NULL CONSTRAINT chk_income_kind CHECK (kind IN ('DIVIDEND', 'JCP', 'OTHER'))
+);
+CREATE INDEX IF NOT EXISTS ix_investment_incomes_user_id ON investment_incomes(user_id);
+
+-- Catálogo inicial de corretoras (Broker Component).
+INSERT INTO brokers (broker_name) VALUES ('XP Investimentos'), ('Rico'), ('Clear'), ('NuInvest');

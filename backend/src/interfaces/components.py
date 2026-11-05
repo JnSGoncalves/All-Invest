@@ -1,6 +1,9 @@
 """Contratos consumidos entre os componentes atualmente implementados."""
 
+from datetime import date
 from decimal import Decimal
+from datetime import datetime
+from ..db.schemas import TradeUpdate, BrokerCreate, IncomeCreate
 from typing import Any, Protocol
 
 from fastapi import Request
@@ -8,9 +11,15 @@ from fastapi.responses import RedirectResponse
 from .. import models
 from ..db.schemas import (
     AuthResponse,
+    BrokerCreate,
     PortfolioCreate,
     PortfolioUpdate,
+    PortfolioPerformanceOut,
     PositionOut,
+    PositionValuationOut,
+    ReturnPeriod,
+    ReturnsOut,
+    StockPerformanceOut,
     StockTradeCreate,
     UserCreate,
 )
@@ -62,6 +71,12 @@ class IMarketDataService(Protocol):
     async def validate_ticker(self, stock_name: str) -> dict[str, Any]: ...
 
     async def get_quote(self, stock_name: str) -> Decimal: ...
+
+    async def get_price_history(
+        self, stock_name: str, start: date, end: date
+    ) -> list[tuple[date, Decimal]]:
+        """Fechamentos diários (data, preço) em ordem crescente, com cache."""
+        ...
 
     async def list_tickers(
         self,
@@ -126,6 +141,37 @@ class IPortfolioService(Protocol):
         ...
 
 
+class IBrokerService(Protocol):
+    """
+    Interface fornecida pelo Broker Component (catálogo global de corretoras).
+
+    As corretoras são compartilhadas por todos os usuários; o nome é único
+    sem diferenciar maiúsculas. Cada usuário tem seus vínculos em `users_brokers`.
+    """
+
+    def list_brokers(self) -> list[models.Broker]:
+        """consultarCorretoras. Pós: todas as corretoras do catálogo, por nome."""
+        ...
+
+    def list_user_brokers(self, user_id: int) -> list[models.Broker]:
+        """HU04. Pós: somente as corretoras vinculadas ao usuário, por nome."""
+        ...
+
+    def get_broker(self, broker_id: int) -> models.Broker:
+        """Pré: corretora cadastrada (senão 404)."""
+        ...
+
+    def create_broker(self, user_id: int, broker_in: BrokerCreate) -> models.Broker:
+        """cadastrarCorretora. Pré: corretora ainda não vinculada ao usuário (senão 409).
+        Pós: corretora no catálogo, disponível para todos, e vinculada ao usuário."""
+        ...
+
+    def delete_broker(self, broker_id: int) -> None:
+        """removerCorretora. Pré: corretora cadastrada (senão 404) e sem
+        operações registradas (senão 409). Pós: corretora e vínculos removidos."""
+        ...
+
+
 class IInvestmentService(Protocol):
     """
     Interface fornecida pelo Investment Component (Lab 3: IInvestmentService).
@@ -133,6 +179,9 @@ class IInvestmentService(Protocol):
     Interfaces requeridas: IPortfolioService (carteiras) e IMarketDataService
     (validação do ticker e cotação).
     """
+
+    def update_trade(self, user_id: int, stock_name: str, trade_date: datetime,
+                     payload: TradeUpdate) -> models.UserStock: ...
 
     async def create_trade(
         self, user_id: int, trade_in: StockTradeCreate
@@ -167,3 +216,90 @@ class IInvestmentService(Protocol):
         """removerInvestimento. Pré: ativo existe na carteira do usuário (senão 404).
         Pós: operações e associação à carteira removidas; retorna o total apagado."""
         ...
+
+
+class IReturnsService(Protocol):
+    """
+    Interface fornecida pelo Returns Component (HU08 - rendimentos).
+
+    Interfaces requeridas: IInvestmentService (operações do usuário),
+    IPortfolioService (carteira de cada ativo) e IMarketDataService
+    (cotações históricas).
+    """
+
+    async def get_returns(
+        self, user_id: int, period: ReturnPeriod, portfolio_id: int | None = None
+    ) -> ReturnsOut:
+        """consultarRendimento. Pré: se portfolio_id for informado, a carteira é
+        do usuário (senão 404).
+        Pós: ganho ou perda por ativo e total no período, com a série diária
+        (vazia em "max") e os ativos sem cotação listados em `unavailable`."""
+        ...
+
+
+class IPerformanceService(Protocol):
+    """
+    Interface fornecida pelo Performance Component (Lab 7: Serviço de Desempenho).
+
+    Interfaces requeridas: IInvestmentService (posições do usuário),
+    IPortfolioService (dados da carteira) e IMarketDataService (cotações).
+    Consumidores previstos: Report Component e Frontend.
+    """
+
+    async def evaluate_positions(
+        self, user_id: int, portfolio_id: int
+    ) -> list[PositionValuationOut]:
+        """avaliarPosicoes. Pré: carteira do usuário (senão 404) e cotação de cada
+        ação disponível (senão 404). Pós: posições com cotação atual, valor
+        investido e valor de mercado; carteira sem posições retorna []."""
+        ...
+
+    async def get_stock_performance(
+        self, user_id: int, portfolio_id: int, stock_name: str
+    ) -> StockPerformanceOut:
+        """consultarDesempenhoAcao. Pré: carteira do usuário e ação presente nela
+        (senão 404). Pós: posição avaliada com ganho ou perda e rentabilidade."""
+        ...
+
+    async def get_portfolio_performance(
+        self, user_id: int, portfolio_id: int
+    ) -> PortfolioPerformanceOut:
+        """obterDesempenhoCarteira. Pré: carteira do usuário (senão 404).
+        Pós: totais, rentabilidade sobre os totais e detalhamento por ação."""
+        ...
+
+    async def evaluate_available(
+        self, user_id: int, portfolio_id: int | None = None
+    ) -> tuple[list[StockPerformanceOut], list[PositionOut]]:
+        """Avaliação tolerante a falhas de cotação, para relatórios. Pré: se
+        portfolio_id for informado, a carteira é do usuário (senão 404).
+        Pós: posições avaliadas e, à parte, as que ficaram sem cotação."""
+        ...
+
+    async def recalculate(self, user_id: int) -> None:
+        """Acionada de forma assíncrona após compras e vendas. Pós: cotações das
+        posições renovadas; falhas são registradas e não afetam a operação."""
+        ...
+
+
+class IReportService(Protocol):
+    """
+    Interface fornecida pelo Report Component.
+
+    Interfaces requeridas: IPerformanceService (valores e valorização),
+    IInvestmentService (movimentações), IIncomeService (proventos) e
+    IPortfolioService (carteiras).
+    """
+
+    async def export_workbook(self, user_id: int, portfolio_id: int | None = None) -> bytes:
+        """exportarPlanilha. Pré: se portfolio_id for informado, a carteira é do
+        usuário (senão 404). Pós: arquivo .xlsx com Resumo, Posições e uma aba por
+        ação; ações sem cotação aparecem marcadas e ficam fora dos totais."""
+        ...
+
+
+class IIncomeService(Protocol):
+    def list(self, user_id: int) -> list[models.Income]: ...
+    def get(self, user_id: int, income_id: int) -> models.Income: ...
+    def save(self, user_id: int, payload: IncomeCreate, income_id: int | None = None) -> models.Income: ...
+    def delete(self, user_id: int, income_id: int) -> None: ...

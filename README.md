@@ -7,6 +7,11 @@ Aplicação web para centralizar ações da B3. A pessoa cria uma conta, organiz
 > Documentos da entrega na raiz: [`Especificacao_Componentes.pdf`](Especificacao_Componentes.pdf),
 > [`Roteiro_Video.pdf`](Roteiro_Video.pdf) e [`Relatorio_Implementacao.pdf`](Relatorio_Implementacao.pdf).
 
+> **Lab 7 – Especificação e Implementação de Serviços.**
+> Serviço implementado: **Serviço de Desempenho da Carteira**, do Bounded Context *Desempenho da Carteira*.
+> Documentos da entrega na raiz: [`Especificacao_Implementacao_Servicos.pdf`](docs/Especificacao_Implementacao_Servicos.pdf)
+> e [`Roteiro_Video_2.pdf`](docs/Roteiro_Video_2.pdf). Evidências em [`docs/evidencias/lab7/`](docs/evidencias/lab7/).
+
 **Equipe:** Danilo Henrique de Paulo · Jônatas da Silva Gonçalves · Kaynã de Deus Ferreira da Silva · Pedro Henrique da Fonseca do Nascimento · Vinícius do Nascimento Generoso · Wallace dos Santos Izidoro
 
 ## Tecnologias utilizadas
@@ -15,7 +20,7 @@ Aplicação web para centralizar ações da B3. A pessoa cria uma conta, organiz
 |---|---|
 | Backend (componentes) | Python 3.12, FastAPI 0.141, Pydantic 2, SQLAlchemy 2.0 |
 | Banco de dados | PostgreSQL (Supabase); SQLite em memória nos testes |
-| Integração externa | brapi.dev (validação de ticker e cotação, via Market Data Component) |
+| Integração externa | brapi.dev (validação de ticker, cotação e histórico, via Market Data Component) |
 | Testes | pytest 9, plugin anyio (testes assíncronos), `TestClient` do FastAPI |
 | Frontend | React, TypeScript e Vite |
 | Infraestrutura | Docker Compose, Nginx, GitHub Actions |
@@ -54,6 +59,7 @@ backend/
 ├── pytest.ini
 └── requirements-dev.txt
 database/migrations/002_create_portfolios.sql   # Tabelas do Portfolio Component
+database/migrations/003_brokers_catalog.sql     # Catálogo global de corretoras
 docs/evidencias/                                # Saída da execução dos testes
 ```
 
@@ -86,7 +92,53 @@ As interfaces são `typing.Protocol` em [`backend/src/interfaces/components.py`]
 | editarInvestimento() (associar ação à carteira) | `associate_position(user_id, stock_name, portfolio_id)` | `PUT /api/stocks/{ticker}/portfolio` |
 | removerInvestimento() | `remove_position(user_id, stock_name)` | `DELETE /api/stocks/{ticker}` |
 
+### `IBrokerService` (fornecida pelo Broker Component)
+
+Catálogo **global** de corretoras, compartilhado por todos os usuários, mais os vínculos de cada usuário em `users_brokers` (HU04). O nome é único sem diferenciar maiúsculas. O Investment Component recusa operações com `broker_id` fora do catálogo (400).
+
+| Operação | Método | Endpoint |
+|---|---|---|
+| consultarCorretoras() (vinculadas ao usuário) | `list_user_brokers(user_id)` | `GET /api/brokers` |
+| consultarCorretoras() (catálogo) | `list_brokers()`, `get_broker(broker_id)` | `GET /api/brokers/catalogo` |
+| cadastrarCorretora() | `create_broker(user_id, broker_in)` (já vinculada ao usuário: 409) | `POST /api/brokers` |
+| removerCorretora() | `delete_broker(broker_id)` (com operações registradas: 409) | `DELETE /api/brokers/{id}` |
+
 Todas as rotas exigem `X-API-Key` e `Authorization: Bearer <access_token>`. Uma carteira de outro usuário é tratada como inexistente (404).
+
+### `IPerformanceService` (Serviço de Desempenho da Carteira, Lab 7)
+
+Apura o resultado dos investimentos a preço de mercado. Requer `IInvestmentService` (posições), `IPortfolioService` (carteira) e `IMarketDataService` (cotações). O Report Component já consome o serviço na exportação em Excel; o Frontend é consumidor previsto.
+
+| Operação | Método | Endpoint |
+|---|---|---|
+| avaliarPosicoes() | `evaluate_positions(user_id, portfolio_id)` | `GET /api/performance/portfolios/{portfolio_id}/positions` |
+| consultarDesempenhoAcao() | `get_stock_performance(user_id, portfolio_id, stock_name)` | `GET /api/performance/portfolios/{portfolio_id}/positions/{stock_name}` |
+| obterDesempenhoCarteira() | `get_portfolio_performance(user_id, portfolio_id)` | `GET /api/performance/portfolios/{portfolio_id}` |
+| Recálculo assíncrono | `recalculate(user_id)` | Acionado por `POST /api/stocks` em `BackgroundTasks` |
+
+Respostas de erro: **401** (autenticação ou chave de API inválida), **404** (carteira inexistente ou de outro usuário, cotação não encontrada ou ação fora da carteira), **422** (`portfolio_id` inválido) e **504** (tempo de consulta excedido). Carteira sem posições retorna `[]`. As demais falhas do provedor de cotações (429, 502 e 503) são repassadas como o Market Data as define.
+
+A consulta é síncrona (REST com JSON). Depois de uma compra ou venda, `POST /api/stocks` responde sem esperar e agenda o recálculo, que renova as cotações das posições. As cotações ficam 60 segundos em cache, para que consultas em sequência usem o mesmo preço e não gastem o limite da brapi; as posições são sempre lidas na hora, então qualquer mudança na carteira aparece na consulta seguinte.
+
+Valores monetários saem como texto (`"3000.00"`), como nas demais rotas da API, para não perder precisão.
+
+### `IReportService` (Report Component)
+
+Exporta a carteira em Excel. Requer `IPerformanceService` (valores e valorização), `IInvestmentService` (movimentações), `IIncomeService` (proventos) e `IPortfolioService` (carteiras).
+
+| Operação | Método | Endpoint |
+|---|---|---|
+| exportarPlanilha() | `export_workbook(user_id, portfolio_id=None)` | `GET /api/reports/export?portfolio_id=` |
+
+Sem `portfolio_id`, a planilha traz todas as posições, inclusive as sem carteira. O arquivo `.xlsx` tem as abas:
+
+- **Resumo:** totais, valorização, proventos e o que não está incluído no cálculo.
+- **Posições:** uma linha por ação, com situação `Aberta`, `Encerrada` ou `Sem cotação`, e link para a aba da ação.
+- **Uma aba por ação:** movimentações com saldo e preço médio depois de cada operação, e proventos. Ações vendidas por inteiro também têm aba.
+
+Respostas de erro: **401** (autenticação ou chave de API inválida), **404** (carteira inexistente ou de outro usuário) e **422** (`portfolio_id` inválido). Uma cotação indisponível não impede a exportação: a ação fica marcada como `Sem cotação` e sai dos totais.
+
+A valorização é calculada sobre as posições abertas e não inclui lucro de vendas realizadas, bonificações não lançadas, impostos e taxas.
 
 ## Como ocorre a comunicação entre os componentes
 
@@ -119,9 +171,11 @@ Os testes ficam em [`backend/tests/`](backend/tests/). Eles usam SQLite em memó
 | `test_investment_component.py` | Unitário (Investment com stub de `IPortfolioService`) | Registrar compra/venda; cotação automática; ticker inválido (404); corretora inválida (400); venda acima do saldo (422); preço médio; filtro por carteira; associar e remover investimento; chamadas feitas à interface do Portfolio |
 | `test_integration_investment_portfolio.py` | Integração (componentes reais) | Operação com carteira associa o ativo; mover ativo entre carteiras; posições por carteira; remover carteira preserva as operações; remover investimento desfaz a associação; carteira de outro usuário é recusada |
 | `test_api_integration.py` | Integração ponta a ponta (HTTP) | Fluxo pelas rotas: criar carteira, registrar compra com carteira, consultar por carteira, mover, editar e remover; erros 404, 409, 422 e API key inválida (401) |
+| `test_performance_component.py` | Integração ponta a ponta (HTTP) | Contrato do Serviço de Desempenho: campos de `avaliarPosicoes`; carteira vazia; ganho, perda e rentabilidade sobre os totais; erros 401, 404, 422 e 504; cache de cotações e recálculo assíncrono |
+| `test_report_component.py` | Integração ponta a ponta (HTTP) | Conteúdo da planilha: abas, valores iguais aos da API de desempenho, saldo e preço médio por operação, ações encerradas e sem cotação, proventos, proteção contra fórmulas e isolamento entre usuários |
 | `test_interface_contracts.py` | Contrato | As implementações expõem todas as operações das interfaces, com a mesma assinatura e o mesmo modo (síncrono/assíncrono); o Investment requer `IPortfolioService` |
 
-Resultado atual: **45 testes aprovados**. A saída completa está em [`docs/evidencias/resultado_testes.txt`](docs/evidencias/resultado_testes.txt), com versão JUnit XML no mesmo diretório. O workflow [`tests.yml`](.github/workflows/tests.yml) executa os testes a cada push.
+Resultado atual: **154 testes aprovados**. A saída da entrega do Lab 7 (129 testes) está em [`docs/evidencias/lab7/resultado_testes.txt`](docs/evidencias/lab7/resultado_testes.txt), ao lado da execução real da API e das capturas do Swagger UI. A saída do Lab 4 continua em [`docs/evidencias/resultado_testes.txt`](docs/evidencias/resultado_testes.txt). O workflow [`tests.yml`](.github/workflows/tests.yml) executa os testes a cada push.
 
 ### Executar os testes
 
@@ -132,6 +186,8 @@ pip install -r requirements-dev.txt
 python -m pytest -v                                      # todos
 python -m pytest tests/test_portfolio_component.py -v    # somente o Portfolio
 python -m pytest tests/test_investment_component.py -v   # somente o Investment
+python -m pytest tests/test_performance_component.py -v  # somente o Serviço de Desempenho
+python -m pytest tests/test_report_component.py -v       # somente a exportação em Excel
 python -m pytest tests/test_integration_investment_portfolio.py tests/test_api_integration.py -v   # integração
 ```
 
@@ -149,6 +205,7 @@ python -m pytest tests/test_integration_investment_portfolio.py tests/test_api_i
 
 1. No SQL Editor do Supabase, execute [`database/CreateTables.sql`](database/CreateTables.sql) para criar as tabelas (se ainda não existirem).
    Em um banco criado antes do Lab 4, execute apenas [`database/migrations/002_create_portfolios.sql`](database/migrations/002_create_portfolios.sql). Ela cria `portfolios` e `portfolios_stocks` sem alterar as tabelas existentes.
+   Em um banco criado antes do cadastro de corretoras, execute também [`database/migrations/003_brokers_catalog.sql`](database/migrations/003_brokers_catalog.sql). Ela torna o nome da corretora único e cadastra XP Investimentos, Rico, Clear e NuInvest, caso ainda não existam.
 2. Copie e preencha os arquivos locais de ambiente:
 
    ```powershell
@@ -214,13 +271,59 @@ Abra <http://localhost:4671> para o frontend e <http://localhost:4670/docs> para
 
 ## Funcionalidades incluídas
 
+### Listagem de corretoras (HU04)
+
+`GET /api/brokers` exige `X-API-Key` e `Authorization: Bearer <access_token>`.
+Retorna apenas as corretoras vinculadas ao usuário autenticado em `users_brokers`,
+ordenadas por nome, no formato `[{"broker_id": 1, "broker_name": "XP Investimentos"}]`.
+Sem vínculos, retorna HTTP 200 com `[]`. Os IDs desta listagem são os IDs reais do
+banco. Para exigir que a corretora esteja vinculada à conta em uma operação, envie
+`broker_source="registered"` (sem vínculo: 404). O valor padrão `catalog` aceita qualquer
+corretora de `GET /api/brokers/catalogo`, que é a lista usada pelo formulário de operações.
+Os testes da rota estão em `backend/tests/test_api_integration.py`.
+
 - Cadastro de usuário e login por e-mail/senha.
 - Login com Google opcional, quando as credenciais OAuth estão configuradas.
 - Sessão com access token e renovação automática usando refresh token.
 - Carteira por usuário com resumo de posições e preço médio.
 - Registro de compra e venda com validação do ticker pela BRAPI.
+- Cadastro de corretoras em um catálogo global, direto do formulário de operação.
 - Carteiras do usuário (criar, listar, editar e remover) e associação de cada ativo a uma carteira.
 - Consulta das posições filtrada por carteira.
 - Remoção de um ticker e de seu histórico de movimentações da carteira autenticada.
 
 Ao remover um ticker, o backend apaga todas as operações daquele ticker pertencentes ao usuário atual e desfaz a associação com a carteira. A operação exige confirmação na interface.
+
+
+## Complementos dos cartões concluídos
+
+- `POST /api/brokers`: recebe `broker_name`, valida o nome e vincula a corretora
+  ao usuário autenticado. Retorna 201; vínculo duplicado retorna 409.
+- `GET /api/stocks/carteira/paginada?page=1&limit=10`: posições ordenadas por
+  ticker, metadados de paginação e totais de toda a carteira.
+  `/api/stocks/carteira` mantém o contrato anterior. A interface usa essa lista
+  completa (filtro por carteira, distribuição e totais) e pagina a tabela no cliente.
+- `PATCH /api/stocks/{ticker}/trades?trade_date=<ISO-8601 com fuso>`: corrige
+  `stock_quantity`, `stock_price` e `trade_side` de uma movimentação. A data
+  identifica a operação existente, junto com o ticker e o usuário autenticado.
+  Todos os três campos são obrigatórios. Rejeita correções que causariam saldo
+  negativo em qualquer ponto do histórico (422); operação alheia retorna 404.
+- `GET/POST /api/incomes` e `PUT/DELETE /api/incomes/{id}`: consulta, cadastro,
+  substituição e remoção de rendimentos recebidos. O payload contém `stock_name`,
+  `amount` (valor total recebido), `received_at` (ISO-8601 com fuso) e `kind`
+  (`DIVIDEND`, `JCP` ou `OTHER`). O ativo deve constar no histórico do usuário.
+  Esses lançamentos persistem mesmo após a remoção das operações do ativo.
+  Não representam cálculo de valorização histórica por período da HU08.
+
+Todas essas rotas exigem API key e Bearer token e isolam os dados por usuário.
+Para bancos existentes, execute `database/migrations/003_create_incomes.sql`.
+Novos bancos já recebem a tabela via `database/CreateTables.sql`.
+
+Os testes de API cobrem os novos fluxos e OAuth com provedor externo simulado,
+mas persistência, emissão de JWT e revogação de sessão reais. Não dependem de
+credenciais Google nem fazem chamadas externas. O tipo do ID da sessão usa
+INTEGER no SQLite de testes e continua BIGINT no PostgreSQL.
+
+Para testar a paginação visual, execute `npx playwright test` em `frontend`
+(com Microsoft Edge instalado). O teste inicia o Vite na porta 4175, simula
+as respostas da API e verifica navegação e preservação dos totais.

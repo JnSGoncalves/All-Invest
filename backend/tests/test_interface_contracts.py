@@ -10,9 +10,24 @@ import inspect
 
 import pytest
 
-from src.interfaces import IInvestmentService, IPortfolioService
+from src.interfaces import (
+    IBrokerService,
+    IIncomeService,
+    IInvestmentService,
+    IMarketDataService,
+    IPerformanceService,
+    IPortfolioService,
+    IReportService,
+    IReturnsService,
+)
+from src.services.broker_service import BrokerService
+from src.services.income_service import IncomeService
 from src.services.investment_service import InvestmentService
+from src.services.market_data_service import BrapiMarketDataService
+from src.services.performance_service import PerformanceService
 from src.services.portfolio_service import PortfolioService
+from src.services.report_service import ReportService
+from src.services.returns_service import ReturnsService
 
 
 def _operations(protocol) -> list[str]:
@@ -25,8 +40,26 @@ def _operations(protocol) -> list[str]:
 
 @pytest.mark.parametrize(
     ("protocol", "implementation"),
-    [(IPortfolioService, PortfolioService), (IInvestmentService, InvestmentService)],
-    ids=["Portfolio", "Investment"],
+    [
+        (IPortfolioService, PortfolioService),
+        (IInvestmentService, InvestmentService),
+        (IMarketDataService, BrapiMarketDataService),
+        (IReturnsService, ReturnsService),
+        (IBrokerService, BrokerService),
+        (IIncomeService, IncomeService),
+        (IPerformanceService, PerformanceService),
+        (IReportService, ReportService),
+    ],
+    ids=[
+        "Portfolio",
+        "Investment",
+        "MarketData",
+        "Returns",
+        "Broker",
+        "Income",
+        "Performance",
+        "Report",
+    ],
 )
 def test_implementacao_fornece_todas_as_operacoes_da_interface(protocol, implementation):
     for name in _operations(protocol):
@@ -62,3 +95,11 @@ def test_investment_requer_portfolio_pelo_construtor():
     parameters = inspect.signature(InvestmentService.__init__).parameters
 
     assert parameters["portfolios"].annotation is IPortfolioService
+
+
+def test_returns_requer_componentes_pelo_construtor():
+    parameters = inspect.signature(ReturnsService.__init__).parameters
+
+    assert parameters["investments"].annotation is IInvestmentService
+    assert parameters["portfolios"].annotation is IPortfolioService
+    assert parameters["market_data"].annotation is IMarketDataService

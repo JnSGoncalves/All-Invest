@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime, timezone
 from decimal import Decimal
 from typing import Literal
 
@@ -66,6 +66,7 @@ class StockTradeCreate(BaseModel):
     stock_quantity: int = Field(gt=0)
     stock_price: Decimal | None = Field(default=None, gt=0, max_digits=15, decimal_places=4)
     broker_id: int = Field(gt=0)
+    broker_source: Literal["catalog", "registered"] = "catalog"
     trade_side: Literal["BUY", "SELL"]
     trade_date: datetime | None = None
     auto_cotacao: bool = False
@@ -117,6 +118,120 @@ class PositionOut(BaseModel):
     portfolio_name: str | None = None
 
 
+class PositionPage(BaseModel):
+    results: list[PositionOut]
+    page: int
+    total_pages: int
+    total_items: int
+    total_quantity: int
+    total_invested: Decimal
+
+
+class TradeUpdate(BaseModel):
+    stock_quantity: int = Field(gt=0)
+    stock_price: Decimal = Field(gt=0, max_digits=15, decimal_places=4)
+    trade_side: Literal["BUY", "SELL"]
+
+
+class IncomeCreate(BaseModel):
+    stock_name: str = Field(min_length=1, max_length=20)
+    amount: Decimal = Field(gt=0, max_digits=15, decimal_places=4)
+    received_at: datetime
+    kind: Literal["DIVIDEND", "JCP", "OTHER"] = "DIVIDEND"
+
+    @field_validator("received_at")
+    @classmethod
+    def require_timezone(cls, value: datetime) -> datetime:
+        if value.tzinfo is None:
+            raise ValueError("received_at deve incluir fuso horário.")
+        return value
+
+    @field_validator("stock_name")
+    @classmethod
+    def normalize_ticker(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("Informe o ativo.")
+        return value.strip().upper()
+
+
+class IncomeOut(IncomeCreate):
+    model_config = ConfigDict(from_attributes=True)
+    income_id: int
+
+    @field_validator("received_at")
+    @classmethod
+    def require_timezone(cls, value: datetime) -> datetime:
+        # SQLite devolve TIMESTAMP sem tzinfo; a persistência usa UTC.
+        return value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value
+
+
+# Sem exemplo, o Swagger gera valores a partir do padrão do Decimal (centenas de dígitos).
+_VALUATION_EXAMPLE = {
+    "stock_name": "PETR4",
+    "company_name": "Petróleo Brasileiro S.A. - Petrobras",
+    "stock_quantity": 100,
+    "preco_medio": "30.0000",
+    "portfolio_id": 1,
+    "portfolio_name": "Dividendos",
+    "current_price": "33.00",
+    "invested_value": "3000.00",
+    "market_value": "3300.00",
+}
+_PERFORMANCE_EXAMPLE = {**_VALUATION_EXAMPLE, "gain": "300.00", "profitability_pct": "10.00"}
+
+
+class PositionValuationOut(PositionOut):
+    """Posição avaliada a preço de mercado (avaliarPosicoes)."""
+
+    model_config = ConfigDict(json_schema_extra={"examples": [_VALUATION_EXAMPLE]})
+
+    current_price: Decimal
+    invested_value: Decimal = Field(description="Quantidade x preço médio.")
+    market_value: Decimal = Field(description="Quantidade x cotação atual.")
+
+
+class StockPerformanceOut(PositionValuationOut):
+    """Resultado de uma ação na carteira (consultarDesempenhoAcao)."""
+
+    model_config = ConfigDict(json_schema_extra={"examples": [_PERFORMANCE_EXAMPLE]})
+
+    gain: Decimal = Field(description="Ganho (positivo) ou perda (negativo) em reais.")
+    profitability_pct: Decimal | None = Field(
+        default=None, description="Rentabilidade em porcentagem; 12.50 = 12,5%."
+    )
+
+
+class PortfolioPerformanceOut(BaseModel):
+    """Desempenho consolidado da carteira (obterDesempenhoCarteira)."""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "portfolio_id": 1,
+                    "portfolio_name": "Dividendos",
+                    "total_invested": "3000.00",
+                    "total_market_value": "3300.00",
+                    "total_gain": "300.00",
+                    "profitability_pct": "10.00",
+                    "positions": [_PERFORMANCE_EXAMPLE],
+                }
+            ]
+        }
+    )
+
+    portfolio_id: int
+    portfolio_name: str
+    total_invested: Decimal
+    total_market_value: Decimal
+    total_gain: Decimal
+    profitability_pct: Decimal | None = Field(
+        default=None,
+        description="Calculada sobre os totais; nula quando não há valor investido.",
+    )
+    positions: list[StockPerformanceOut]
+
+
 class PortfolioCreate(BaseModel):
     portfolio_name: str = Field(min_length=1, max_length=100)
     description: str | None = Field(default=None, max_length=255)
@@ -160,6 +275,25 @@ class PortfolioOut(BaseModel):
     created_at: datetime
 
 
+class BrokerCreate(BaseModel):
+    broker_name: str = Field(min_length=1, max_length=150)
+
+    @field_validator("broker_name")
+    @classmethod
+    def normalize_name(cls, value: str) -> str:
+        name = " ".join(value.split())
+        if not name:
+            raise ValueError("O nome da corretora não pode ser vazio.")
+        return name
+
+
+class BrokerOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    broker_id: int
+    broker_name: str
+
+
 class PortfolioAssignment(BaseModel):
     portfolio_id: int = Field(gt=0)
 
@@ -188,6 +322,57 @@ class TickerListOut(BaseModel):
     total_pages: int
     total_items: int
     has_next_page: bool
+
+
+ReturnPeriod = Literal["1w", "1mo", "3mo", "max"]
+
+
+class AssetReturnOut(BaseModel):
+    """Rendimento de um ativo no período (HU08)."""
+
+    stock_name: str
+    company_name: str
+    portfolio_name: str | None = None
+    start_quantity: int
+    end_quantity: int
+    start_price: Decimal | None = Field(
+        default=None, description="Fechamento no início do período; nulo se não havia posição."
+    )
+    end_price: Decimal
+    start_value: Decimal
+    bought: Decimal = Field(description="Valor das compras feitas dentro do período.")
+    sold: Decimal = Field(description="Valor das vendas feitas dentro do período.")
+    end_value: Decimal
+    gain: Decimal = Field(description="Ganho (positivo) ou perda (negativo) em reais.")
+    gain_rate: Decimal | None = Field(
+        default=None,
+        description="Ganho sobre o capital do período (valor inicial + compras); 0.05 = 5%.",
+    )
+
+
+class ReturnPointOut(BaseModel):
+    date: date
+    invested: Decimal = Field(description="Valor inicial somado às compras e descontadas as vendas.")
+    value: Decimal = Field(description="Valor de mercado das posições no fechamento do dia.")
+    gain: Decimal
+
+
+class ReturnsOut(BaseModel):
+    period: ReturnPeriod
+    start_date: date | None = None
+    end_date: date | None = Field(default=None, description="Data da cotação mais recente usada.")
+    has_assets: bool = Field(description="Falso quando o usuário ainda não registrou operações.")
+    start_value: Decimal
+    bought: Decimal
+    sold: Decimal
+    end_value: Decimal
+    gain: Decimal
+    gain_rate: Decimal | None = None
+    assets: list[AssetReturnOut]
+    series: list[ReturnPointOut]
+    unavailable: list[str] = Field(
+        description="Ativos sem cotação disponível, fora dos totais."
+    )
 
 
 # Compatibilidade temporária para imports antigos.

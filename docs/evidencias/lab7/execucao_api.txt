@@ -1,0 +1,351 @@
+# Execução real do Serviço de Desempenho da Carteira - 2026-11-01 22:50:14
+# uvicorn + API real + cotações reais da brapi.dev + banco SQLite local e descartável
+# Dados fictícios. Sequência gerada por script; o log do servidor está em log_servidor.txt.
+
+### Saúde da API
+>>> GET /health
+    X-API-Key: <ausente> | Authorization: <ausente>
+<<< HTTP 200 (299 ms)
+{
+  "status": "ok"
+}
+
+### Cadastro de Investidor Demo
+>>> POST /api/users
+    X-API-Key: <válida> | Authorization: <ausente>
+    corpo: {"name": "Investidor Demo", "email": "investidor1793584214@example.com", "password": "senha-demo-123"}
+<<< HTTP 201 (667 ms)
+
+### Cadastro de Outro Investidor
+>>> POST /api/users
+    X-API-Key: <válida> | Authorization: <ausente>
+    corpo: {"name": "Outro Investidor", "email": "outro1793584214@example.com", "password": "senha-demo-123"}
+<<< HTTP 201 (635 ms)
+
+### Login
+>>> POST /api/v1/auth/login
+    X-API-Key: <válida> | Authorization: <ausente>
+    corpo: {"email": "investidor1793584214@example.com", "password": "senha-demo-123"}
+<<< HTTP 200 (635 ms)
+
+### Login do outro usuário
+>>> POST /api/v1/auth/login
+    X-API-Key: <válida> | Authorization: <ausente>
+    corpo: {"email": "outro1793584214@example.com", "password": "senha-demo-123"}
+<<< HTTP 200 (647 ms)
+
+### Criar carteira Dividendos
+>>> POST /api/portfolios
+    X-API-Key: <válida> | Authorization: Bearer <token>
+    corpo: {"portfolio_name": "Dividendos"}
+<<< HTTP 201 (508 ms)
+{
+  "portfolio_id": 1,
+  "portfolio_name": "Dividendos",
+  "description": null,
+  "created_at": "2026-11-02T01:50:17"
+}
+
+### Criar carteira sem posições
+>>> POST /api/portfolios
+    X-API-Key: <válida> | Authorization: Bearer <token>
+    corpo: {"portfolio_name": "Vazia"}
+<<< HTTP 201 (512 ms)
+{
+  "portfolio_id": 2,
+  "portfolio_name": "Vazia",
+  "description": null,
+  "created_at": "2026-11-02T01:50:18"
+}
+
+### Catálogo de corretoras
+>>> GET /api/brokers/catalogo
+    X-API-Key: <válida> | Authorization: Bearer <token>
+<<< HTTP 200 (496 ms)
+[
+  {
+    "broker_id": 3,
+    "broker_name": "Clear"
+  },
+  {
+    "broker_id": 4,
+    "broker_name": "NuInvest"
+  },
+  {
+    "broker_id": 2,
+    "broker_name": "Rico"
+  },
+  {
+    "broker_id": 1,
+    "broker_name": "XP Investimentos"
+  }
+]
+
+### Comprar PETR4 (aciona o recálculo assíncrono)
+>>> POST /api/stocks
+    X-API-Key: <válida> | Authorization: Bearer <token>
+    corpo: {"stock_name": "PETR4", "stock_quantity": 100, "stock_price": 30.0, "broker_id": 3, "trade_side": "BUY", "portfolio_id": 1}
+<<< HTTP 201 (1313 ms)
+{
+  "stock_name": "PETR4",
+  "company_name": "Petroleo Brasileiro SA Pfd",
+  "stock_quantity": 100,
+  "stock_price": "30.0000",
+  "broker_id": 3,
+  "broker_name": "Clear",
+  "trade_side": "BUY",
+  "trade_date": "2026-11-02T01:50:20.291810Z"
+}
+
+### Comprar VALE3 (aciona o recálculo assíncrono)
+>>> POST /api/stocks
+    X-API-Key: <válida> | Authorization: Bearer <token>
+    corpo: {"stock_name": "VALE3", "stock_quantity": 50, "stock_price": 60.5, "broker_id": 3, "trade_side": "BUY", "portfolio_id": 1}
+<<< HTTP 201 (1053 ms)
+{
+  "stock_name": "VALE3",
+  "company_name": "Vale S.A.",
+  "stock_quantity": 50,
+  "stock_price": "60.5000",
+  "broker_id": 3,
+  "broker_name": "Clear",
+  "trade_side": "BUY",
+  "trade_date": "2026-11-02T01:50:22.842138Z"
+}
+
+==============================================================================
+CENÁRIOS DE SUCESSO
+==============================================================================
+
+### avaliarPosicoes
+>>> GET /api/performance/portfolios/1/positions
+    X-API-Key: <válida> | Authorization: Bearer <token>
+<<< HTTP 200 (314 ms)
+[
+  {
+    "stock_name": "PETR4",
+    "company_name": "Petroleo Brasileiro SA Pfd",
+    "stock_quantity": 100,
+    "preco_medio": "30.0000",
+    "portfolio_id": 1,
+    "portfolio_name": "Dividendos",
+    "current_price": "52.71",
+    "invested_value": "3000.00",
+    "market_value": "5271.00"
+  },
+  {
+    "stock_name": "VALE3",
+    "company_name": "Vale S.A.",
+    "stock_quantity": 50,
+    "preco_medio": "60.5000",
+    "portfolio_id": 1,
+    "portfolio_name": "Dividendos",
+    "current_price": "62.02",
+    "invested_value": "3025.00",
+    "market_value": "3101.00"
+  }
+]
+
+### consultarDesempenhoAcao
+>>> GET /api/performance/portfolios/1/positions/PETR4
+    X-API-Key: <válida> | Authorization: Bearer <token>
+<<< HTTP 200 (256 ms)
+{
+  "stock_name": "PETR4",
+  "company_name": "Petroleo Brasileiro SA Pfd",
+  "stock_quantity": 100,
+  "preco_medio": "30.0000",
+  "portfolio_id": 1,
+  "portfolio_name": "Dividendos",
+  "current_price": "52.71",
+  "invested_value": "3000.00",
+  "market_value": "5271.00",
+  "gain": "2271.00",
+  "profitability_pct": "75.70"
+}
+
+### obterDesempenhoCarteira
+>>> GET /api/performance/portfolios/1
+    X-API-Key: <válida> | Authorization: Bearer <token>
+<<< HTTP 200 (473 ms)
+{
+  "portfolio_id": 1,
+  "portfolio_name": "Dividendos",
+  "total_invested": "6025.00",
+  "total_market_value": "8372.00",
+  "total_gain": "2347.00",
+  "profitability_pct": "38.95",
+  "positions": [
+    {
+      "stock_name": "PETR4",
+      "company_name": "Petroleo Brasileiro SA Pfd",
+      "stock_quantity": 100,
+      "preco_medio": "30.0000",
+      "portfolio_id": 1,
+      "portfolio_name": "Dividendos",
+      "current_price": "52.71",
+      "invested_value": "3000.00",
+      "market_value": "5271.00",
+      "gain": "2271.00",
+      "profitability_pct": "75.70"
+    },
+    {
+      "stock_name": "VALE3",
+      "company_name": "Vale S.A.",
+      "stock_quantity": 50,
+      "preco_medio": "60.5000",
+      "portfolio_id": 1,
+      "portfolio_name": "Dividendos",
+      "current_price": "62.02",
+      "invested_value": "3025.00",
+      "market_value": "3101.00",
+      "gain": "76.00",
+      "profitability_pct": "2.51"
+    }
+  ]
+}
+
+### avaliarPosicoes em carteira sem posições
+>>> GET /api/performance/portfolios/2/positions
+    X-API-Key: <válida> | Authorization: Bearer <token>
+<<< HTTP 200 (386 ms)
+[]
+
+==============================================================================
+CENÁRIOS DE ERRO DO CONTRATO
+==============================================================================
+
+### 401 - chave de API ausente
+>>> GET /api/performance/portfolios/1/positions
+    X-API-Key: <ausente> | Authorization: Bearer <token>
+<<< HTTP 401 (524 ms)
+{
+  "detail": "API Key não informada"
+}
+
+### 401 - chave de API inválida
+>>> GET /api/performance/portfolios/1/positions
+    X-API-Key: chave-errada | Authorization: Bearer <token>
+<<< HTTP 401 (623 ms)
+{
+  "detail": "API Key inválida"
+}
+
+### 401 - usuário não autenticado
+>>> GET /api/performance/portfolios/1/positions
+    X-API-Key: <válida> | Authorization: <ausente>
+<<< HTTP 401 (683 ms)
+{
+  "detail": "Autenticação necessária."
+}
+
+### 401 - token inválido
+>>> GET /api/performance/portfolios/1/positions
+    X-API-Key: <válida> | Authorization: token-invalido
+<<< HTTP 401 (622 ms)
+{
+  "detail": "Access token inválido."
+}
+
+### 404 - carteira inexistente
+>>> GET /api/performance/portfolios/999999/positions
+    X-API-Key: <válida> | Authorization: Bearer <token>
+<<< HTTP 404 (535 ms)
+{
+  "detail": "Carteira não encontrada."
+}
+
+### 404 - carteira de outro usuário
+>>> GET /api/performance/portfolios/1/positions
+    X-API-Key: <válida> | Authorization: Bearer <token>
+<<< HTTP 404 (497 ms)
+{
+  "detail": "Carteira não encontrada."
+}
+
+### 404 - ação fora da carteira
+>>> GET /api/performance/portfolios/1/positions/ITUB4
+    X-API-Key: <válida> | Authorization: Bearer <token>
+<<< HTTP 404 (493 ms)
+{
+  "detail": "A ação ITUB4 não está nesta carteira."
+}
+
+### 422 - portfolio_id zero
+>>> GET /api/performance/portfolios/0/positions
+    X-API-Key: <válida> | Authorization: Bearer <token>
+<<< HTTP 422 (494 ms)
+{
+  "detail": [
+    {
+      "type": "greater_than",
+      "loc": [
+        "path",
+        "portfolio_id"
+      ],
+      "msg": "Input should be greater than 0",
+      "input": "0",
+      "ctx": {
+        "gt": 0
+      }
+    }
+  ]
+}
+
+### 422 - portfolio_id não numérico
+>>> GET /api/performance/portfolios/abc/positions
+    X-API-Key: <válida> | Authorization: Bearer <token>
+<<< HTTP 422 (507 ms)
+{
+  "detail": [
+    {
+      "type": "int_parsing",
+      "loc": [
+        "path",
+        "portfolio_id"
+      ],
+      "msg": "Input should be a valid integer, unable to parse string as an integer",
+      "input": "abc"
+    }
+  ]
+}
+
+==============================================================================
+TEMPO EXCEDIDO: segundo servidor, mesmo banco, com um provedor que nunca responde
+==============================================================================
+
+### 504 - tempo de consulta excedido
+>>> GET /api/performance/portfolios/1/positions
+    X-API-Key: <válida> | Authorization: Bearer <token>
+<<< HTTP 504 (11164 ms)
+{
+  "detail": "Tempo de resposta da brapi.dev excedido. Tente novamente."
+}
+
+==============================================================================
+RESUMO
+==============================================================================
+200 (esperado 200) Saúde da API
+201 (esperado 201) Cadastro de Investidor Demo
+201 (esperado 201) Cadastro de Outro Investidor
+200 (esperado 200) Login
+200 (esperado 200) Login do outro usuário
+201 (esperado 201) Criar carteira Dividendos
+201 (esperado 201) Criar carteira sem posições
+200 (esperado 200) Catálogo de corretoras
+201 (esperado 201) Comprar PETR4 (aciona o recálculo assíncrono)
+201 (esperado 201) Comprar VALE3 (aciona o recálculo assíncrono)
+200 (esperado 200) avaliarPosicoes
+200 (esperado 200) consultarDesempenhoAcao
+200 (esperado 200) obterDesempenhoCarteira
+200 (esperado 200) avaliarPosicoes em carteira sem posições
+401 (esperado 401) 401 - chave de API ausente
+401 (esperado 401) 401 - chave de API inválida
+401 (esperado 401) 401 - usuário não autenticado
+401 (esperado 401) 401 - token inválido
+404 (esperado 404) 404 - carteira inexistente
+404 (esperado 404) 404 - carteira de outro usuário
+404 (esperado 404) 404 - ação fora da carteira
+422 (esperado 422) 422 - portfolio_id zero
+422 (esperado 422) 422 - portfolio_id não numérico
+504 (esperado 504) 504 - tempo de consulta excedido
