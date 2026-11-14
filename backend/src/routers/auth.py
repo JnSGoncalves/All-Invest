@@ -29,7 +29,7 @@ def _oauth_error_detail(exc: OAuthError) -> str:
     messages = {
         "mismatching_state": (
             "A sessão de login expirou ou foi iniciada em outro endereço. "
-            "Abra o login pelo Swagger novamente."
+            "Inicie o login com Google novamente."
         ),
         "invalid_client": (
             "O Client ID ou Client Secret configurado no backend é inválido."
@@ -141,16 +141,10 @@ async def google_login(
         request.url_for("google_callback")
     )
 
-    # Cookies não são compartilhados entre localhost e 127.0.0.1. Quando o
-    # Swagger é aberto pelo endereço exibido pelo Uvicorn (127.0.0.1), primeiro
-    # canonicalizamos o início do fluxo para o host usado pelo callback.
+    # Cria a sessão OAuth no host do callback para que o navegador envie o
+    # cookie no retorno do Google, inclusive quando o login começa no frontend.
     callback_url = urlsplit(redirect_uri)
-    local_hosts = {"localhost", "127.0.0.1"}
-    if (
-        request.url.hostname in local_hosts
-        and callback_url.hostname in local_hosts
-        and request.url.hostname != callback_url.hostname
-    ):
+    if callback_url.hostname and request.url.hostname != callback_url.hostname:
         canonical_login_url = (
             f"{callback_url.scheme}://{callback_url.netloc}"
             f"{request.url_for('google_login').path}"
