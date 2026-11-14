@@ -87,7 +87,7 @@ jobs:
         env:
           VITE_API_URL: https://allinvest-api.ojota.dev.br
           API_KEY: ${{ secrets.API_KEY }}
-          GOOGLE_REDIRECT_URI: https://allinvest-api.ojota.dev.br/api/v1/auth/google/callback
+          GOOGLE_REDIRECT_URI: https://allinvest.ojota.dev.br/api/v1/auth/google/callback
           FRONTEND_AUTH_CALLBACK_URL: https://allinvest.ojota.dev.br/auth/callback
           CORS_ORIGINS: https://allinvest.ojota.dev.br
 
