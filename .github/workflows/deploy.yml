@@ -65,7 +65,7 @@ jobs:
 
           printf '%s\n' \
             "VITE_API_URL=$VITE_API_URL" \
-            "VITE_API_KEY=$API_KEY" \
+            "API_KEY=$API_KEY" \
             > frontend/.env
         env:
           VITE_API_URL: https://allinvest-api.ojota.dev.br
