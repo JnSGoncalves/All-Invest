@@ -45,6 +45,8 @@ jobs:
             "CLIENT_SECRET=$CLIENT_SECRET" \
             "SECRET_KEY=$SECRET_KEY" \
             "SESSION_SECRET_KEY=$SESSION_SECRET_KEY" \
+            "BRAPI_URL=${BRAPI_URL:-https://brapi.dev/api/v2}" \
+            "BRAPI_TOKEN=$BRAPI_TOKEN" \
             "ACCESS_TOKEN_EXPIRE_MINUTES=60" \
             "REFRESH_TOKEN_EXPIRE_DAYS=30" \
             > backend/.env
