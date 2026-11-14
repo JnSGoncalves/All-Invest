@@ -388,6 +388,31 @@ def test_oauth_fluxo_completo_com_provedor_simulado(client, monkeypatch, db):
     assert db.query(models.User).filter_by(email="google@example.com").count() == 1
 
 
+def test_oauth_iniciado_no_frontend_cria_sessao_no_host_do_callback(client, monkeypatch):
+    from src.dependencies.components import get_google_oauth_service
+
+    frontend = "https://allinvest.ojota.dev.br"
+    api = "https://allinvest-api.ojota.dev.br"
+    login_path = "/api/v1/auth/google"
+    callback_url = f"{api}{login_path}/callback"
+    monkeypatch.setenv("GOOGLE_REDIRECT_URI", callback_url)
+    monkeypatch.setenv("FRONTEND_AUTH_CALLBACK_URL", f"{frontend}/auth/callback")
+    main.app.dependency_overrides[get_google_oauth_service] = FakeGoogle
+
+    start = client.get(f"{frontend}{login_path}", follow_redirects=False)
+    assert start.status_code == 307
+    assert start.headers["location"] == f"{api}{login_path}"
+    assert "set-cookie" not in start.headers
+
+    authorize = client.get(start.headers["location"], follow_redirects=False)
+    assert authorize.headers["location"].startswith("https://accounts.google.com/")
+    assert "allinvest_oauth_session=" in authorize.headers["set-cookie"]
+
+    callback = client.get(callback_url, follow_redirects=False)
+    assert callback.status_code == 307, callback.text
+    assert callback.headers["location"].startswith(f"{frontend}/auth/callback#")
+
+
 @pytest.mark.parametrize("scenario,expected", [("unconfigured", 503), ("unverified", 401), ("denied", 401), ("state", 401)])
 def test_oauth_erros_nao_criam_sessao(client, monkeypatch, db, scenario, expected):
     from src.dependencies.components import get_google_oauth_service
